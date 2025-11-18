@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "524646525431",
+    "firebase_url": "https://aplikasi-surat-mobile-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "aplikasi-surat-mobile",
+    "storage_bucket": "aplikasi-surat-mobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:524646525431:android:0de77b82a937e2a24366f2",
+        "android_client_info": {
+          "package_name": "com.example.aplikasi_surat_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC_fPn5fFhQhz9lFqcOQNcGoZEWIqMJGZE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:524646525431:android:86af0dc2f0c7fab04366f2",
+        "android_client_info": {
+          "package_name": "com.example.surat_mobile_sukorame"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC_fPn5fFhQhz9lFqcOQNcGoZEWIqMJGZE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,464 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+class RekrutRTRWScreen extends StatefulWidget {
+  @override
+  _RekrutRTRWScreenState createState() => _RekrutRTRWScreenState();
+}
+
+class _RekrutRTRWScreenState extends State<RekrutRTRWScreen> {
+  bool isRt = false, isRw = false;
+  String selectedUid = '';
+  String? selectedRw;
+  String? selectedRt;
+
+  // Helper: count RT documents for an RW with fallbacks for different data shapes
+  Future<int> _countRtForRw(String nomorRw) async {
+    try {
+      // try server-side where first
+      final q = await FirebaseFirestore.instance.collection('rt').where('nomor_rw', isEqualTo: nomorRw).get();
+      if (q.size > 0) return q.size;
+      // fallback: fetch all RT and count client-side by matching id or field
+      final all = await FirebaseFirestore.instance.collection('rt').get();
+      final filtered = all.docs.where((d) {
+        final data = d.data();
+        final field = data['nomor_rw'];
+        if (field != null && field.toString() == nomorRw) return true;
+        if (d.id == nomorRw) return true;
+        // try numeric compare
+        try {
+          if (field != null && int.parse(field.toString()) == int.parse(nomorRw)) return true;
+        } catch (e) {}
+        return false;
+      }).toList();
+      return filtered.length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  // Helper: count warga for RW with fallback
+  Future<int> _countWargaForRw(String nomorRw) async {
+    try {
+      final q = await FirebaseFirestore.instance.collection('users').where('rw', isEqualTo: nomorRw).get();
+      if (q.size > 0) return q.size;
+      final all = await FirebaseFirestore.instance.collection('users').get();
+      final filtered = all.docs.where((d) {
+        final data = d.data();
+        final field = data['rw'];
+        if (field != null && field.toString() == nomorRw) return true;
+        if (d.id == nomorRw) return true;
+        try {
+          if (field != null && int.parse(field.toString()) == int.parse(nomorRw)) return true;
+        } catch (e) {}
+        return false;
+      }).toList();
+      return filtered.length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  // Helper: count warga for RW+RT
+  Future<int> _countWargaForRwRt(String nomorRw, String nomorRt) async {
+    try {
+      final q = await FirebaseFirestore.instance.collection('users').where('rw', isEqualTo: nomorRw).where('rt', isEqualTo: nomorRt).get();
+      if (q.size > 0) return q.size;
+      final all = await FirebaseFirestore.instance.collection('users').get();
+      final filtered = all.docs.where((d) {
+        final data = d.data();
+        final fieldRw = data['rw'];
+        final fieldRt = data['rt'];
+        bool matchRw = false, matchRt = false;
+        if (fieldRw != null && fieldRw.toString() == nomorRw) matchRw = true;
+        if (d.id == nomorRw) matchRw = true;
+        try { if (fieldRw != null && int.parse(fieldRw.toString()) == int.parse(nomorRw)) matchRw = true; } catch (e) {}
+        if (fieldRt != null && fieldRt.toString() == nomorRt) matchRt = true;
+        try { if (fieldRt != null && int.parse(fieldRt.toString()) == int.parse(nomorRt)) matchRt = true; } catch (e) {}
+        return matchRw && matchRt;
+      }).toList();
+      return filtered.length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  Future<void> _rekrut() async {
+    if (selectedUid.isNotEmpty && (isRt || isRw)) {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(selectedUid).get();
+      final nama = doc['nama']; // Pastikan field 'nama' ada
+      final rt = doc['rt'];
+      final rw = doc['rw'];
+      final periodeMulai = DateTime.now().toString().split(' ')[0];
+      final periodeAkhir = DateTime.now().add(Duration(days: 365 * 5)).toString().split(' ')[0];
+
+      String newRole = isRt && isRw ? 'rt_rw' : isRt ? 'rt' : 'rw';
+      await FirebaseFirestore.instance.collection('users').doc(selectedUid).update({'role': newRole});
+
+      if (isRt) {
+        await FirebaseFirestore.instance.collection('rt').add({
+          'uid': selectedUid,
+          'nama': nama,
+          'nomor_rt': rt,
+          'periode_mulai': periodeMulai,
+          'periode_akhir': periodeAkhir,
+          'created_at': DateTime.now().toString(),
+        });
+      }
+
+      if (isRw) {
+        await FirebaseFirestore.instance.collection('rw').add({
+          'uid': selectedUid,
+          'nama': nama,
+          'nomor_rw': rw,
+          'periode_mulai': periodeMulai,
+          'periode_akhir': periodeAkhir,
+          'created_at': DateTime.now().toString(),
+        });
+      }
+
+      await FirebaseFirestore.instance.collection('riwayatRTRW').add({
+        'uid': selectedUid,
+        'nama': nama,
+        'nomor_rw': isRw ? rw : rt,
+        'periode_mulai': periodeMulai,
+        'periode_akhir': periodeAkhir,
+        'created_at': DateTime.now().toString(),
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Rekrut berhasil!')));
+      context.go('/dashboard/kelurahan');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Rekrut RT/RW'), leading: IconButton(icon: Icon(Icons.arrow_back), onPressed: () => context.go('/dashboard/kelurahan'))),
+      body: Container(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        padding: EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // header / breadcrumbs
+            Row(
+              children: [
+                if (selectedRw != null) IconButton(icon: Icon(Icons.arrow_back), onPressed: () => setState(() { selectedRt = null; selectedRw = null; })),
+                SizedBox(width: 8),
+                Expanded(child: Text('Rekrut RT / RW', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // show riwayat RTRW
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Riwayat Rekrut RT/RW'),
+                        content: Container(
+                          width: double.maxFinite,
+                          child: StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance.collection('riwayatRTRW').orderBy('created_at', descending: true).snapshots(),
+                            builder: (context, snap) {
+                              if (snap.hasError) return Text('Gagal memuat riwayat: ${snap.error}');
+                              if (!snap.hasData) return Center(child: CircularProgressIndicator());
+                              final docs = snap.data!.docs;
+                              if (docs.isEmpty) return Text('Belum ada riwayat rekrut.');
+                              return ListView.separated(
+                                shrinkWrap: true,
+                                itemCount: docs.length,
+                                separatorBuilder: (_,__) => Divider(),
+                                itemBuilder: (context, i) {
+                                  final d = docs[i].data() as Map<String, dynamic>? ?? {};
+                                  final nama = d['nama'] ?? '-';
+                                  final nomor = d['nomor_rw'] ?? d['nomor_rt'] ?? '-';
+                                  final periode = '${d['periode_mulai'] ?? '-'} → ${d['periode_akhir'] ?? '-'}';
+                                  return ListTile(
+                                    title: Text('$nama • $nomor'),
+                                    subtitle: Text(periode),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('Tutup'))],
+                      ),
+                    );
+                  },
+                  icon: Icon(Icons.history),
+                  label: Text('Riwayat'),
+                  style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+                ),
+              ],
+            ),
+            SizedBox(height: 12),
+
+            // If no RW selected -> show RW list
+            if (selectedRw == null) Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                // be permissive: just listen to 'rw' collection (documents may already exist with ids like '01')
+                stream: FirebaseFirestore.instance.collection('rw').snapshots(),
+                builder: (context, snap) {
+                  if (snap.hasError) return Center(child: Text('Gagal memuat RW: ${snap.error}'));
+                  if (!snap.hasData) return Center(child: CircularProgressIndicator());
+                  final docs = snap.data!.docs;
+                  if (docs.isEmpty) return Center(child: Text('Belum ada RW terdaftar.'));
+                  return ListView.separated(
+                    itemCount: docs.length,
+                    separatorBuilder: (_,__) => SizedBox(height: 8),
+                    itemBuilder: (context, idx) {
+                      final doc = docs[idx];
+                      final data = doc.data() as Map<String, dynamic>?;
+                      final nomorRwField = (data != null && data.containsKey('nomor_rw') && data['nomor_rw'] != null) ? data['nomor_rw'].toString() : null;
+                      final nomorRw = nomorRwField ?? doc.id;
+                      final nama = (data != null && data.containsKey('nama') && data['nama'] != null) ? data['nama'].toString() : 'RW $nomorRw';
+                      final assignedRw = data != null && data.containsKey('uid') && (data['uid'] != null && data['uid'].toString().isNotEmpty);
+                      return Card(
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        child: InkWell(
+                          onTap: () => setState(() => selectedRw = nomorRw),
+                          child: Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                CircleAvatar(backgroundColor: Colors.green[600], child: Text(nomorRw.toString(), style: TextStyle(color: Colors.white))),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(nama, style: TextStyle(fontWeight: FontWeight.w700)),
+                                      SizedBox(height: 6),
+                                      FutureBuilder<int>(
+                                        future: _countRtForRw(nomorRw.toString()),
+                                        builder: (context, s2) {
+                                          final rtCount = s2.data ?? 0;
+                                          return FutureBuilder<int>(
+                                            future: _countWargaForRw(nomorRw.toString()),
+                                            builder: (context, s3) {
+                                              final wargaCount = s3.data ?? 0;
+                                              return Row(
+                                                children: [
+                                                  // indicate whether RW already has a leader (uid)
+                                                  _statusBadge(!assignedRw ? 'Belum Ketua RW' : (rtCount == 0 ? 'No RT' : '$rtCount RT'), !assignedRw || rtCount == 0),
+                                                  SizedBox(width: 8),
+                                                  _statusBadge(wargaCount == 0 ? 'Kosong' : '$wargaCount Warga', wargaCount == 0),
+                                                ],
+                                              );
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(Icons.chevron_right),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            )
+            else if (selectedRw != null && selectedRt == null) ...[
+              // List RTs within selected RW
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('RW $selectedRw - Daftar RT', style: TextStyle(fontWeight: FontWeight.w600))),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  // fetch all RTs and filter client-side to be tolerant of existing doc formats
+                  stream: FirebaseFirestore.instance.collection('rt').snapshots(),
+                  builder: (context, snap) {
+                    if (snap.hasError) return Center(child: Text('Gagal memuat RT: ${snap.error}'));
+                    if (!snap.hasData) return Center(child: CircularProgressIndicator());
+                    final allDocs = snap.data!.docs;
+                    final filtered = allDocs.where((d) {
+                      final data = d.data() as Map<String, dynamic>?;
+                      final field = data != null && data.containsKey('nomor_rw') ? data['nomor_rw'].toString() : null;
+                      if (field != null && field == selectedRw) return true;
+                      if (d.id == selectedRw) return true;
+                      try {
+                        if (field != null && int.parse(field) == int.parse(selectedRw!)) return true;
+                      } catch (e) {}
+                      return false;
+                    }).toList();
+                    if (filtered.isEmpty) return Center(child: Text('Belum ada RT terdaftar di RW $selectedRw. Anda bisa merekrut dari warga.'));
+                    // sort by nomor_rt if present
+                    filtered.sort((a, b) {
+                      final da = a.data() as Map<String, dynamic>?;
+                      final db = b.data() as Map<String, dynamic>?;
+                      final numa = da != null && da.containsKey('nomor_rt') ? int.tryParse(da['nomor_rt'].toString()) ?? 999 : 999;
+                      final numb = db != null && db.containsKey('nomor_rt') ? int.tryParse(db['nomor_rt'].toString()) ?? 999 : 999;
+                      return numa.compareTo(numb);
+                    });
+                    return ListView.separated(
+                      itemCount: filtered.length,
+                      separatorBuilder: (_,__) => SizedBox(height: 8),
+                      itemBuilder: (context, idx) {
+                        final doc = filtered[idx];
+                        final data = doc.data() as Map<String, dynamic>?;
+                        final nomorRt = (data != null && data.containsKey('nomor_rt') && data['nomor_rt'] != null) ? data['nomor_rt'].toString() : doc.id;
+                        final nama = (data != null && data.containsKey('nama') && data['nama'] != null) ? data['nama'].toString() : 'RT $nomorRt';
+                        final assignedRt = (data != null && data.containsKey('uid') && (data['uid'] != null && data['uid'].toString().isNotEmpty));
+                        return Card(
+                          child: ListTile(
+                            title: Text(nama, style: TextStyle(fontWeight: FontWeight.w700)),
+                            subtitle: FutureBuilder<int>(
+                              future: _countWargaForRwRt(selectedRw!, nomorRt),
+                              builder: (context, s) {
+                                final count = s.data ?? 0;
+                                return Row(
+                                  children: [
+                                    Text(count == 0 ? 'RT kosong' : '$count warga'),
+                                    SizedBox(width: 10),
+                                    _statusBadge(!assignedRt ? 'Belum Ketua RT' : 'Terisi', !assignedRt),
+                                  ],
+                                );
+                              },
+                            ),
+                            trailing: ElevatedButton(
+                              onPressed: () => setState(() => selectedRt = nomorRt),
+                              child: Text('Lihat Warga'),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ] else if (selectedRt != null) ...[
+              // List warga in selected RT
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('RW $selectedRw • RT $selectedRt - Warga', style: TextStyle(fontWeight: FontWeight.w600))),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  // fetch users and filter client-side to be flexible with RW/RT field formats
+                  stream: FirebaseFirestore.instance.collection('users').snapshots(),
+                  builder: (context, snap) {
+                    if (snap.hasError) return Center(child: Text('Gagal memuat warga: ${snap.error}'));
+                    if (!snap.hasData) return Center(child: CircularProgressIndicator());
+                    final all = snap.data!.docs;
+                    final filtered = all.where((d) {
+                      final data = d.data() as Map<String, dynamic>?;
+                      if (data == null) return false;
+                      final fieldRw = data.containsKey('rw') ? data['rw'].toString() : null;
+                      final fieldRt = data.containsKey('rt') ? data['rt'].toString() : null;
+                      bool matchRw = false, matchRt = false;
+                      if (fieldRw != null && fieldRw == selectedRw) matchRw = true;
+                      if (fieldRt != null && fieldRt == selectedRt) matchRt = true;
+                      try { if (fieldRw != null && int.parse(fieldRw) == int.parse(selectedRw!)) matchRw = true; } catch (e) {}
+                      try { if (fieldRt != null && int.parse(fieldRt) == int.parse(selectedRt!)) matchRt = true; } catch (e) {}
+                      return matchRw && matchRt;
+                    }).toList();
+                    if (filtered.isEmpty) return Center(child: Text('Tidak ada warga di RT $selectedRt.'));
+                    return ListView.separated(
+                      itemCount: filtered.length,
+                      separatorBuilder: (_,__) => Divider(height: 1),
+                      itemBuilder: (context, idx) {
+                        final d = filtered[idx];
+                        final data = d.data() as Map<String, dynamic>?;
+                        return ListTile(
+                          title: Text(data?['nama'] ?? '-'),
+                          subtitle: Text('NIK: ${data?['nik'] ?? '-'}'),
+                          trailing: Text(data?['noHp'] ?? '-'),
+                          onTap: () => _showWargaActions(d.id, data ?? {}),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+
+            SizedBox(height: 12),
+            // existing recruit controls (kept at bottom)
+            Divider(),
+            SizedBox(height: 8),
+            Text('Rekrut dari warga', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: CheckboxListTile(title: Text('RT'), value: isRt, onChanged: (val) => setState(() => isRt = val!))),
+              Expanded(child: CheckboxListTile(title: Text('RW'), value: isRw, onChanged: (val) => setState(() => isRw = val!))),
+            ]),
+            SizedBox(height: 8),
+            SizedBox(
+              height: 140,
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('users').where('role', isEqualTo: 'warga').snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
+                  return ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: snapshot.data!.docs.map((doc) {
+                      return GestureDetector(
+                        onTap: () => setState(() => selectedUid = doc.id),
+                        child: Container(
+                          width: 220,
+                          margin: EdgeInsets.only(right: 12),
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: selectedUid == doc.id ? Colors.green[50] : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(doc['nama'] ?? '-', style: TextStyle(fontWeight: FontWeight.w700)),
+                              SizedBox(height: 6),
+                              Text('RT ${doc['rt']} / RW ${doc['rw']}', style: TextStyle(color: Colors.grey[700])),
+                              Spacer(),
+                              Text(doc['noHp'] ?? '-'),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: 8),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
+              onPressed: _rekrut,
+              child: Text('Rekrut'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statusBadge(String text, bool isAlert) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: isAlert ? Colors.red.shade50 : Colors.green.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isAlert ? Colors.red.shade200 : Colors.green.shade200),
+      ),
+      child: Text(text, style: TextStyle(color: isAlert ? Colors.red.shade800 : Colors.green.shade800, fontWeight: FontWeight.w600)),
+    );
+  }
+
+  void _showWargaActions(String id, Map<String, dynamic> data) {
+    showModalBottomSheet(context: context, builder: (context) {
+      return SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(title: Text(data['nama'] ?? '-'), subtitle: Text('NIK: ${data['nik'] ?? '-'}')),
+            ListTile(leading: Icon(Icons.person), title: Text('Lihat Profil'), onTap: () { Navigator.pop(context); context.push('/detail-warga/$id'); }),
+            ListTile(leading: Icon(Icons.check), title: Text('Rekrut sebagai RT'), onTap: () { Navigator.pop(context); setState(() { selectedUid = id; isRt = true; isRw = false; }); }),
+            ListTile(leading: Icon(Icons.check), title: Text('Rekrut sebagai RW'), onTap: () { Navigator.pop(context); setState(() { selectedUid = id; isRw = true; isRt = false; }); }),
+            ListTile(leading: Icon(Icons.close), title: Text('Tutup'), onTap: () => Navigator.pop(context)),
+          ],
+        ),
+      );
+    });
+  }
+}

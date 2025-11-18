@@ -1,0 +1,267 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class DetailAkunScreen extends StatefulWidget {
+  @override
+  State<DetailAkunScreen> createState() => _DetailAkunScreenState();
+}
+
+class _DetailAkunScreenState extends State<DetailAkunScreen> {
+  bool _loading = true;
+  Map<String, dynamic>? _user;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      setState(() {
+        _loading = false;
+      });
+      return;
+    }
+    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    setState(() {
+      _user = doc.data();
+      _loading = false;
+    });
+  }
+
+  String _maskPhone(String? p) {
+    if (p == null || p.isEmpty) return '-';
+    if (p.length <= 4) return p;
+    final visible = p.substring(p.length - 3);
+    return '${'*' * (p.length - 3)}$visible';
+  }
+
+  Future<void> _updateField(String fieldKey, String label, String? initial) async {
+    final controller = TextEditingController(text: initial ?? '');
+    final formKey = GlobalKey<FormState>();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Ubah $label'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            decoration: InputDecoration(labelText: label),
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Tidak boleh kosong' : null,
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Batal')),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState?.validate() ?? false) Navigator.pop(context, true);
+            },
+            child: Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({fieldKey: controller.text.trim()});
+      await _loadUser();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label berhasil diubah')));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal mengubah $label: $e')));
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Hapus Akun'),
+        content: Text('Menghapus akun akan menghilangkan semua data Anda. Lanjutkan?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Batal')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: Text('Hapus', style: TextStyle(color: Colors.white))),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // delete firestore doc
+      await FirebaseFirestore.instance.collection('users').doc(uid).delete();
+      // try to delete auth user (may require recent login)
+      try {
+        await FirebaseAuth.instance.currentUser?.delete();
+      } catch (e) {
+        // deletion failed (likely requires re-authentication)
+        Navigator.pop(context);
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Gagal menghapus akun'),
+            content: Text('Penghapusan akun memerlukan masuk ulang untuk keamanan. Silakan masuk kembali lalu coba lagi.'),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('OK'))],
+          ),
+        );
+        return;
+      }
+      // clear role and sign out
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('role');
+      await FirebaseAuth.instance.signOut();
+      Navigator.pop(context); // close progress
+  Navigator.pop(context); // close progress
+  context.go('/');
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal menghapus akun: $e')));
+    }
+  }
+
+  Widget _buildTopBoxes() {
+    return Row(
+      children: [
+        Expanded(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Telepon', style: TextStyle(fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8),
+                  Text(_maskPhone(_user?['noHp'])),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(onPressed: () => _updateField('noHp', 'Telepon', _user?['noHp']), child: Text('Ubah')),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Email', style: TextStyle(fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8),
+                  Text(_user?['email'] ?? '-'),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(onPressed: () => _updateField('email', 'Email', _user?['email']), child: Text('Ubah')),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('NIK', style: TextStyle(fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8),
+                  Text(_user?['nik'] ?? '-'),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(onPressed: () => _updateField('nik', 'NIK', _user?['nik']), child: Text('Ubah')),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailCard() {
+    final fields = {
+      'Nama': _user?['nama'] ?? '-',
+      'Jenis Kelamin': _user?['jenisKelamin'] ?? '-',
+      'Tempat Lahir': _user?['tempatLahir'] ?? '-',
+      'Tanggal Lahir': _user?['tanggalLahir'] ?? '-',
+      'Pekerjaan': _user?['pekerjaan'] ?? '-',
+      'Status dalam Keluarga': _user?['statusDiKeluarga'] ?? '-',
+      'Status Perkawinan': _user?['statusPerkawinan'] ?? '-',
+      'Alamat': _user?['alamat'] ?? '-',
+      'RT/RW': 'RT ${_user?['rt'] ?? '-'} / RW ${_user?['rw'] ?? '-'}',
+      'Kelurahan': _user?['kelurahan'] ?? '-',
+      'Kecamatan': _user?['kecamatan'] ?? '-',
+      'Kota': _user?['kota'] ?? '-',
+      'Provinsi': _user?['provinsi'] ?? '-',
+    };
+
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ...fields.entries.map((e) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6.0),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(e.key, style: TextStyle(color: Colors.grey[700]))),
+                      Expanded(child: Text(e.value, style: TextStyle(fontWeight: FontWeight.w600))),
+                    ],
+                  ),
+                )),
+            SizedBox(height: 12),
+            ElevatedButton(onPressed: () => Navigator.pop(context), child: Text('Ubah')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Detail Akun')),
+      body: _loading
+          ? Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildTopBoxes(),
+                  SizedBox(height: 12),
+                  _buildDetailCard(),
+                  SizedBox(height: 20),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    onPressed: _deleteAccount,
+                    child: Text('Hapus Akun'),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+}
