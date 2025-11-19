@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DetailAkunScreen extends StatefulWidget {
   @override
@@ -83,7 +84,7 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Hapus Akun'),
-        content: Text('Menghapus akun akan menghilangkan semua data Anda. Lanjutkan?'),
+        content: Text('Menghapus akun akan menghilangkan semua data Anda secara permanen. Lanjutkan?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Batal')),
           ElevatedButton(onPressed: () => Navigator.pop(context, true), child: Text('Hapus', style: TextStyle(color: Colors.white))),
@@ -92,6 +93,19 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
     );
     if (confirm != true) return;
 
+    // Show password dialog for re-authentication
+    final password = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _PasswordDialog(),
+    );
+    if (password == null || password.isEmpty) return;
+
+    // Perform deletion
+    _performAccountDeletion(password);
+  }
+
+  Future<void> _performAccountDeletion(String password) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
@@ -102,34 +116,76 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
     );
 
     try {
-      // delete firestore doc
+      final user = FirebaseAuth.instance.currentUser;
+      final email = user?.email;
+      
+      if (email == null) throw Exception('Email tidak ditemukan');
+
+      // Re-authenticate
+      final credential = EmailAuthProvider.credential(email: email, password: password);
+      await user!.reauthenticateWithCredential(credential);
+
+      // Delete Firestore doc
       await FirebaseFirestore.instance.collection('users').doc(uid).delete();
-      // try to delete auth user (may require recent login)
+
+      // Delete Supabase files (KK, KTP, TTD if exist)
       try {
-        await FirebaseAuth.instance.currentUser?.delete();
+        final supabase = Supabase.instance.client;
+        final storage = supabase.storage.from('dokumen-warga');
+        
+        // List all files for this user
+        final files = await storage.list(path: '');
+        for (final file in files) {
+          if (file.name.startsWith(uid)) {
+            await storage.remove([file.name]);
+          }
+        }
       } catch (e) {
-        // deletion failed (likely requires re-authentication)
-        Navigator.pop(context);
-        await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Gagal menghapus akun'),
-            content: Text('Penghapusan akun memerlukan masuk ulang untuk keamanan. Silakan masuk kembali lalu coba lagi.'),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('OK'))],
-          ),
-        );
-        return;
+        // Ignore storage cleanup errors, proceed with auth deletion
+        print('Supabase cleanup error: $e');
       }
-      // clear role and sign out
+
+      // Delete Auth user
+      await user.delete();
+
+      // Clear prefs and sign out
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('role');
       await FirebaseAuth.instance.signOut();
-      Navigator.pop(context); // close progress
-  Navigator.pop(context); // close progress
-  context.go('/');
+
+      Navigator.pop(context); // close progress dialog
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('✓ Akun berhasil dihapus'), backgroundColor: Colors.green),
+        );
+        await Future.delayed(Duration(seconds: 1));
+        context.go('/');
+      }
+    } on FirebaseAuthException catch (e) {
+      Navigator.pop(context);
+      
+      if (mounted) {
+        String message = 'Gagal menghapus akun';
+        if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+          message = 'Password tidak benar';
+        } else if (e.code == 'requires-recent-login') {
+          message = 'Silakan logout dan login kembali, lalu coba lagi';
+        } else if (e.code == 'user-not-found') {
+          message = 'Pengguna tidak ditemukan';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ $message'), backgroundColor: Colors.red),
+        );
+      }
     } catch (e) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal menghapus akun: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Gagal menghapus akun: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -232,7 +288,7 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
                   ),
                 )),
             SizedBox(height: 12),
-            ElevatedButton(onPressed: () => Navigator.pop(context), child: Text('Ubah')),
+            ElevatedButton(onPressed: () => context.push('/biodata?mode=edit'), child: Text('Ubah')),
           ],
         ),
       ),
@@ -262,6 +318,57 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+class _PasswordDialog extends StatefulWidget {
+  @override
+  __PasswordDialogState createState() => __PasswordDialogState();
+}
+
+class __PasswordDialogState extends State<_PasswordDialog> {
+  final _controller = TextEditingController();
+  bool _showPassword = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Konfirmasi Penghapusan Akun'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Masukkan password Anda untuk mengkonfirmasi penghapusan akun.', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+          SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            obscureText: !_showPassword,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              border: OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: Icon(_showPassword ? Icons.visibility : Icons.visibility_off),
+                onPressed: () => setState(() => _showPassword = !_showPassword),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text('Batal')),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: Text('Hapus Akun'),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+        ),
+      ],
     );
   }
 }

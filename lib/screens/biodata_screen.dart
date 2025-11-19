@@ -5,9 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/user_model.dart';
+import '../utils/ux_helper.dart';
+import '../utils/validation_helper.dart';
 
 class BiodataScreen extends StatefulWidget {
+  final bool isEditMode;
+  
+  BiodataScreen({this.isEditMode = false});
+
   @override
   _BiodataScreenState createState() => _BiodataScreenState();
 }
@@ -20,7 +25,7 @@ class _BiodataScreenState extends State<BiodataScreen> {
   bool _isLoading = false;
   
   // Controllers untuk editing
-  late TextEditingController _namaCtrl, _nikCtrl, _alamatCtrl, _rtCtrl, _rwCtrl, _kecamatanCtrl, _kotaCtrl, _provinsiCtrl, _tempatLahirCtrl, _pekerjaanCtrl, _noHpCtrl;
+  late TextEditingController _namaCtrl, _nikCtrl, _alamatCtrl, _kecamatanCtrl, _kotaCtrl, _provinsiCtrl, _tempatLahirCtrl, _pekerjaanCtrl, _noHpCtrl;
   
   // Autocomplete suggestions
   final List<String> _pekerjaanList = ['PNS', 'Wiraswasta', 'Pelajar', 'Mahasiswa', 'Pensiunan', 'Lainnya'];
@@ -30,8 +35,13 @@ class _BiodataScreenState extends State<BiodataScreen> {
 
   // Form values
   String? _selectedAgama, _selectedJenisKelamin, _selectedStatusDiKeluarga, _selectedStatusPerkawinan;
+  String? _selectedRt, _selectedRw;
   DateTime? _selectedTanggalLahir;
   String? _urlFotoKk, _urlFotoKtp;
+  
+  // Master data for dropdowns
+  List<String> _rwList = [];
+  List<String> _rtList = [];
 
   @override
   void initState() {
@@ -39,14 +49,88 @@ class _BiodataScreenState extends State<BiodataScreen> {
     _namaCtrl = TextEditingController();
     _nikCtrl = TextEditingController();
     _alamatCtrl = TextEditingController();
-    _rtCtrl = TextEditingController();
-    _rwCtrl = TextEditingController();
     _kecamatanCtrl = TextEditingController();
     _kotaCtrl = TextEditingController();
     _provinsiCtrl = TextEditingController();
     _tempatLahirCtrl = TextEditingController();
     _pekerjaanCtrl = TextEditingController();
     _noHpCtrl = TextEditingController();
+    
+    // Load RT/RW master data
+    _loadRtRwData();
+    
+    // Load existing data if in edit mode
+    if (widget.isEditMode) {
+      _loadExistingBiodata();
+    }
+  }
+  
+  Future<void> _loadRtRwData() async {
+    try {
+      // Load RW list
+      final rwSnapshot = await _firestore.collection('rw').get();
+      final rwList = rwSnapshot.docs
+          .map((doc) => doc['nomor_rw']?.toString() ?? '')
+          .where((rw) => rw.isNotEmpty)
+          .toList()
+        ..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+      
+      // Load RT list
+      final rtSnapshot = await _firestore.collection('rt').get();
+      final rtList = rtSnapshot.docs
+          .map((doc) => doc['nomor_rt']?.toString() ?? '')
+          .where((rt) => rt.isNotEmpty)
+          .toList()
+        ..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+      
+      setState(() {
+        _rwList = rwList;
+        _rtList = rtList;
+      });
+    } catch (e) {
+      print('Error loading RT/RW data: $e');
+    }
+  }
+
+  Future<void> _loadExistingBiodata() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+      
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (!doc.exists) return;
+      
+      final data = doc.data() as Map<String, dynamic>;
+      setState(() {
+        _namaCtrl.text = data['nama'] ?? '';
+        _nikCtrl.text = data['nik'] ?? '';
+        _alamatCtrl.text = data['alamat'] ?? '';
+        _selectedRt = data['rt']?.toString();
+        _selectedRw = data['rw']?.toString();
+        _kecamatanCtrl.text = data['kecamatan'] ?? '';
+        _kotaCtrl.text = data['kota'] ?? '';
+        _provinsiCtrl.text = data['provinsi'] ?? '';
+        _tempatLahirCtrl.text = data['tempatLahir'] ?? '';
+        _pekerjaanCtrl.text = data['pekerjaan'] ?? '';
+        _noHpCtrl.text = data['noHp'] ?? '';
+        
+        _selectedAgama = data['agama'];
+        _selectedJenisKelamin = data['jenisKelamin'];
+        _selectedStatusDiKeluarga = data['statusDiKeluarga'];
+        _selectedStatusPerkawinan = data['statusPerkawinan'];
+        
+        if (data['tanggalLahir'] != null) {
+          _selectedTanggalLahir = DateTime.parse(data['tanggalLahir'] as String);
+        }
+        
+        _urlFotoKk = data['urlFotoKk'];
+        _urlFotoKtp = data['urlFotoKtp'];
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat data: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   @override
@@ -54,8 +138,6 @@ class _BiodataScreenState extends State<BiodataScreen> {
     _namaCtrl.dispose();
     _nikCtrl.dispose();
     _alamatCtrl.dispose();
-    _rtCtrl.dispose();
-    _rwCtrl.dispose();
     _kecamatanCtrl.dispose();
     _kotaCtrl.dispose();
     _provinsiCtrl.dispose();
@@ -128,65 +210,76 @@ class _BiodataScreenState extends State<BiodataScreen> {
   Future<void> _saveBiodata() async {
     if (!_formKey.currentState!.validate()) return;
     
-    // Validasi foto wajib
-    if (_urlFotoKk == null || _urlFotoKtp == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Foto KK dan KTP harus diupload'), backgroundColor: Colors.orange),
-      );
+    // Validasi foto wajib hanya jika create (bukan edit)
+    if (!widget.isEditMode && (_urlFotoKk == null || _urlFotoKtp == null)) {
+      UxHelper.showWarning(context, 'Foto KK dan KTP harus diupload');
       return;
     }
     
     // Validasi dropdown
-    if (_selectedAgama == null || _selectedJenisKelamin == null || _selectedStatusDiKeluarga == null || _selectedStatusPerkawinan == null || _selectedTanggalLahir == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Semua field harus diisi'), backgroundColor: Colors.red),
-      );
+    if (_selectedAgama == null || _selectedJenisKelamin == null || _selectedStatusDiKeluarga == null || _selectedStatusPerkawinan == null || _selectedTanggalLahir == null || _selectedRt == null || _selectedRw == null) {
+      UxHelper.showError(context, 'Semua field harus diisi');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final user = UserModel(
-        uid: FirebaseAuth.instance.currentUser!.uid,
-        nama: _namaCtrl.text.trim(),
-        nik: _nikCtrl.text.trim(),
-        alamat: _alamatCtrl.text.trim(),
-        rt: _rtCtrl.text.trim(),
-        rw: _rwCtrl.text.trim(),
-        kelurahan: 'Sukorame',
-        kecamatan: _kecamatanCtrl.text.trim(),
-        kota: _kotaCtrl.text.trim(),
-        provinsi: _provinsiCtrl.text.trim(),
-        agama: _selectedAgama!,
-        jenisKelamin: _selectedJenisKelamin!,
-        tanggalLahir: DateFormat('yyyy-MM-dd').format(_selectedTanggalLahir!),
-        tempatLahir: _tempatLahirCtrl.text.trim(),
-        pekerjaan: _pekerjaanCtrl.text.trim(),
-        statusDiKeluarga: _selectedStatusDiKeluarga!,
-        statusPerkawinan: _selectedStatusPerkawinan!,
-        kewarganegaraan: 'NKRI',
-        role: 'warga',
-        createdAt: DateTime.now().toString(),
-        email: FirebaseAuth.instance.currentUser!.email!,
-        noHp: _noHpCtrl.text.trim(),
-        urlFotoKk: _urlFotoKk,
-        urlFotoKtp: _urlFotoKtp,
-      );
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final userData = <String, dynamic>{
+        'nama': _namaCtrl.text.trim(),
+        'nik': _nikCtrl.text.trim(),
+        'alamat': _alamatCtrl.text.trim(),
+        'rt': _selectedRt!,
+        'rw': _selectedRw!,
+        'kelurahan': 'Sukorame',
+        'kecamatan': _kecamatanCtrl.text.trim(),
+        'kota': _kotaCtrl.text.trim(),
+        'provinsi': _provinsiCtrl.text.trim(),
+        'agama': _selectedAgama!,
+        'jenisKelamin': _selectedJenisKelamin!,
+        'tanggalLahir': DateFormat('yyyy-MM-dd').format(_selectedTanggalLahir!),
+        'tempatLahir': _tempatLahirCtrl.text.trim(),
+        'pekerjaan': _pekerjaanCtrl.text.trim(),
+        'statusDiKeluarga': _selectedStatusDiKeluarga!,
+        'statusPerkawinan': _selectedStatusPerkawinan!,
+        'kewarganegaraan': 'NKRI',
+        'noHp': _noHpCtrl.text.trim(),
+      };
+      
+      // Add photos only if not null (for edit mode)
+      if (_urlFotoKk != null) userData['urlFotoKk'] = _urlFotoKk;
+      if (_urlFotoKtp != null) userData['urlFotoKtp'] = _urlFotoKtp;
 
-      await _firestore.collection('users').doc(user.uid).set(user.toMap());
+      if (widget.isEditMode) {
+        // Update existing user
+        await _firestore.collection('users').doc(uid).update(userData);
+      } else {
+        // Create new user
+        userData['uid'] = uid;
+        userData['role'] = 'warga';
+        userData['createdAt'] = DateTime.now().toString();
+        userData['email'] = FirebaseAuth.instance.currentUser!.email!;
+        
+        await _firestore.collection('users').doc(uid).set(userData);
+      }
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✓ Biodata berhasil disimpan'), backgroundColor: Colors.green),
-        );
-        context.go('/dashboard/warga');
+        UxHelper.showSuccess(context, 'Biodata berhasil disimpan');
+        if (widget.isEditMode) {
+          Future.delayed(Duration(milliseconds: 800), () {
+            if (mounted) context.pop(); // Go back to detail_akun_screen
+          });
+        } else {
+          Future.delayed(Duration(milliseconds: 800), () {
+            if (mounted) context.go('/dashboard/warga'); // Go to dashboard after create
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Gagal menyimpan: $e'), backgroundColor: Colors.red),
-        );
+        final errorMsg = ValidationHelper.getErrorMessage(e as Exception);
+        UxHelper.showError(context, errorMsg);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -215,25 +308,21 @@ class _BiodataScreenState extends State<BiodataScreen> {
                     TextFormField(
                       controller: _namaCtrl,
                       decoration: InputDecoration(labelText: 'Nama Lengkap *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person)),
-                      validator: (val) => val!.isEmpty ? 'Nama wajib diisi' : null,
+                      validator: ValidationHelper.validateNama,
                     ),
                     SizedBox(height: 12),
                     TextFormField(
                       controller: _nikCtrl,
                       decoration: InputDecoration(labelText: 'NIK (16 digit) *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.badge)),
                       keyboardType: TextInputType.number,
-                      validator: (val) {
-                        if (val!.isEmpty) return 'NIK wajib diisi';
-                        if (val.length != 16) return 'NIK harus tepat 16 digit';
-                        return null;
-                      },
+                      validator: ValidationHelper.validateNIK,
                       maxLength: 16,
                     ),
                     SizedBox(height: 12),
                     TextFormField(
                       controller: _tempatLahirCtrl,
                       decoration: InputDecoration(labelText: 'Tempat Lahir *', border: OutlineInputBorder()),
-                      validator: (val) => val!.isEmpty ? 'Tempat lahir wajib diisi' : null,
+                      validator: (val) => val!.isEmpty ? 'Tempat lahir tidak boleh kosong' : val.length < 3 ? 'Minimal 3 karakter' : null,
                     ),
                     SizedBox(height: 12),
                     GestureDetector(
@@ -299,19 +388,29 @@ class _BiodataScreenState extends State<BiodataScreen> {
                     ),
                     SizedBox(height: 12),
                     Row(children: [
-                      Expanded(child: TextFormField(
-                        controller: _rtCtrl,
-                        decoration: InputDecoration(labelText: 'RT *', border: OutlineInputBorder()),
-                        keyboardType: TextInputType.number,
-                        validator: (val) => val!.isEmpty ? 'RT wajib' : null,
-                      )),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          decoration: InputDecoration(labelText: 'RT *', border: OutlineInputBorder()),
+                          value: _selectedRt,
+                          items: _rtList.isEmpty
+                              ? [DropdownMenuItem(value: null, child: Text('Memuat data...'))]
+                              : _rtList.map((rt) => DropdownMenuItem(value: rt, child: Text('RT $rt'))).toList(),
+                          onChanged: (val) => setState(() => _selectedRt = val),
+                          validator: (val) => val == null ? 'RT wajib dipilih' : null,
+                        ),
+                      ),
                       SizedBox(width: 12),
-                      Expanded(child: TextFormField(
-                        controller: _rwCtrl,
-                        decoration: InputDecoration(labelText: 'RW *', border: OutlineInputBorder()),
-                        keyboardType: TextInputType.number,
-                        validator: (val) => val!.isEmpty ? 'RW wajib' : null,
-                      )),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          decoration: InputDecoration(labelText: 'RW *', border: OutlineInputBorder()),
+                          value: _selectedRw,
+                          items: _rwList.isEmpty
+                              ? [DropdownMenuItem(value: null, child: Text('Memuat data...'))]
+                              : _rwList.map((rw) => DropdownMenuItem(value: rw, child: Text('RW $rw'))).toList(),
+                          onChanged: (val) => setState(() => _selectedRw = val),
+                          validator: (val) => val == null ? 'RW wajib dipilih' : null,
+                        ),
+                      ),
                     ]),
                     SizedBox(height: 12),
                     TextFormField(
@@ -391,7 +490,7 @@ class _BiodataScreenState extends State<BiodataScreen> {
                       controller: _noHpCtrl,
                       decoration: InputDecoration(labelText: 'No. HP (WhatsApp) *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone)),
                       keyboardType: TextInputType.phone,
-                      validator: (val) => val!.isEmpty ? 'No. HP wajib diisi' : null,
+                      validator: ValidationHelper.validateNoHp,
                     ),
                     SizedBox(height: 24),
                     Divider(),

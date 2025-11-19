@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../utils/ux_helper.dart';
 
 class RekrutRTRWScreen extends StatefulWidget {
   @override
@@ -12,6 +13,7 @@ class _RekrutRTRWScreenState extends State<RekrutRTRWScreen> {
   String selectedUid = '';
   String? selectedRw;
   String? selectedRt;
+  bool _showAllRw = true; // Toggle between "Semua" and "Belum Ada Ketua"
 
   // Helper: count RT documents for an RW with fallbacks for different data shapes
   Future<int> _countRtForRw(String nomorRw) async {
@@ -85,7 +87,12 @@ class _RekrutRTRWScreenState extends State<RekrutRTRWScreen> {
   }
 
   Future<void> _rekrut() async {
-    if (selectedUid.isNotEmpty && (isRt || isRw)) {
+    if (selectedUid.isEmpty || (!isRt && !isRw)) {
+      UxHelper.showWarning(context, 'Pilih warga dan jenis rekrut (RT/RW)');
+      return;
+    }
+
+    try {
       final doc = await FirebaseFirestore.instance.collection('users').doc(selectedUid).get();
       final nama = doc['nama']; // Pastikan field 'nama' ada
       final rt = doc['rt'];
@@ -127,8 +134,12 @@ class _RekrutRTRWScreenState extends State<RekrutRTRWScreen> {
         'created_at': DateTime.now().toString(),
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Rekrut berhasil!')));
-      context.go('/dashboard/kelurahan');
+      UxHelper.showSuccess(context, 'Rekrut berhasil!');
+      Future.delayed(Duration(milliseconds: 800), () {
+        if (mounted) context.go('/dashboard/kelurahan');
+      });
+    } catch (e) {
+      UxHelper.showError(context, 'Gagal merekrut: $e');
     }
   }
 
@@ -193,6 +204,22 @@ class _RekrutRTRWScreenState extends State<RekrutRTRWScreen> {
               ],
             ),
             SizedBox(height: 12),
+            
+            // Toggle between "Available to Recruit" and "All RW" when on RW list
+            if (selectedRt == null && selectedRw == null)
+              Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _filterChip('Semua', _showAllRw, () => setState(() => _showAllRw = true)),
+                      SizedBox(width: 8),
+                      _filterChip('Belum Ada Ketua', !_showAllRw, () => setState(() => _showAllRw = false)),
+                    ],
+                  ),
+                ),
+              ),
 
             // If no RW selected -> show RW list
             if (selectedRw == null) Expanded(
@@ -202,8 +229,22 @@ class _RekrutRTRWScreenState extends State<RekrutRTRWScreen> {
                 builder: (context, snap) {
                   if (snap.hasError) return Center(child: Text('Gagal memuat RW: ${snap.error}'));
                   if (!snap.hasData) return Center(child: CircularProgressIndicator());
-                  final docs = snap.data!.docs;
-                  if (docs.isEmpty) return Center(child: Text('Belum ada RW terdaftar.'));
+                  var docs = snap.data!.docs;
+                  
+                  // Filter by leadership status if "Belum Ada Ketua" is selected
+                  if (!_showAllRw) {
+                    docs = docs.where((d) {
+                      final data = d.data() as Map<String, dynamic>?;
+                      final hasLeader = data != null && data.containsKey('uid') && (data['uid'] != null && data['uid'].toString().isNotEmpty);
+                      return !hasLeader; // Only show RW without leaders
+                    }).toList();
+                  }
+                  
+                  if (docs.isEmpty) {
+                    final emptyMsg = _showAllRw ? 'Belum ada RW terdaftar.' : 'Semua RW sudah memiliki ketua.';
+                    return Center(child: Text(emptyMsg));
+                  }
+                  
                   return ListView.separated(
                     itemCount: docs.length,
                     separatorBuilder: (_,__) => SizedBox(height: 8),
@@ -223,13 +264,16 @@ class _RekrutRTRWScreenState extends State<RekrutRTRWScreen> {
                             padding: EdgeInsets.all(12),
                             child: Row(
                               children: [
-                                CircleAvatar(backgroundColor: Colors.green[600], child: Text(nomorRw.toString(), style: TextStyle(color: Colors.white))),
+                                CircleAvatar(
+                                  backgroundColor: assignedRw ? Colors.green[600] : Colors.orange[600],
+                                  child: Text(nomorRw.toString(), style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                                ),
                                 SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(nama, style: TextStyle(fontWeight: FontWeight.w700)),
+                                      Text(nama, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                                       SizedBox(height: 6),
                                       FutureBuilder<int>(
                                         future: _countRtForRw(nomorRw.toString()),
@@ -242,9 +286,11 @@ class _RekrutRTRWScreenState extends State<RekrutRTRWScreen> {
                                               return Row(
                                                 children: [
                                                   // indicate whether RW already has a leader (uid)
-                                                  _statusBadge(!assignedRw ? 'Belum Ketua RW' : (rtCount == 0 ? 'No RT' : '$rtCount RT'), !assignedRw || rtCount == 0),
+                                                  _statusBadge(!assignedRw ? 'Belum Ada Ketua' : 'Sudah Ada Ketua', !assignedRw),
                                                   SizedBox(width: 8),
-                                                  _statusBadge(wargaCount == 0 ? 'Kosong' : '$wargaCount Warga', wargaCount == 0),
+                                                  _statusBadge(rtCount == 0 ? 'Kosong' : '$rtCount RT', rtCount == 0),
+                                                  SizedBox(width: 8),
+                                                  _statusBadge(wargaCount == 0 ? 'Tidak Ada Warga' : '$wargaCount Warga', wargaCount == 0),
                                                 ],
                                               );
                                             },
@@ -305,24 +351,48 @@ class _RekrutRTRWScreenState extends State<RekrutRTRWScreen> {
                         final nama = (data != null && data.containsKey('nama') && data['nama'] != null) ? data['nama'].toString() : 'RT $nomorRt';
                         final assignedRt = (data != null && data.containsKey('uid') && (data['uid'] != null && data['uid'].toString().isNotEmpty));
                         return Card(
-                          child: ListTile(
-                            title: Text(nama, style: TextStyle(fontWeight: FontWeight.w700)),
-                            subtitle: FutureBuilder<int>(
-                              future: _countWargaForRwRt(selectedRw!, nomorRt),
-                              builder: (context, s) {
-                                final count = s.data ?? 0;
-                                return Row(
-                                  children: [
-                                    Text(count == 0 ? 'RT kosong' : '$count warga'),
-                                    SizedBox(width: 10),
-                                    _statusBadge(!assignedRt ? 'Belum Ketua RT' : 'Terisi', !assignedRt),
-                                  ],
-                                );
-                              },
-                            ),
-                            trailing: ElevatedButton(
-                              onPressed: () => setState(() => selectedRt = nomorRt),
-                              child: Text('Lihat Warga'),
+                          elevation: 1,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          child: Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: assignedRt ? Colors.green[600] : Colors.orange[600],
+                                  child: Text(nomorRt.toString(), style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(nama, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                                      SizedBox(height: 6),
+                                      FutureBuilder<int>(
+                                        future: _countWargaForRwRt(selectedRw!, nomorRt),
+                                        builder: (context, s) {
+                                          final count = s.data ?? 0;
+                                          return Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(count == 0 ? 'RT kosong' : '$count warga', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                                              ),
+                                              SizedBox(width: 8),
+                                              _statusBadge(!assignedRt ? 'Belum Ada Ketua' : 'Sudah Ada Ketua', !assignedRt),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                ElevatedButton(
+                                  onPressed: () => setState(() => selectedRt = nomorRt),
+                                  style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                                  child: Text('Lihat', style: TextStyle(fontSize: 12)),
+                                ),
+                              ],
                             ),
                           ),
                         );
@@ -443,6 +513,21 @@ class _RekrutRTRWScreenState extends State<RekrutRTRWScreen> {
         border: Border.all(color: isAlert ? Colors.red.shade200 : Colors.green.shade200),
       ),
       child: Text(text, style: TextStyle(color: isAlert ? Colors.red.shade800 : Colors.green.shade800, fontWeight: FontWeight.w600)),
+    );
+  }
+
+  Widget _filterChip(String label, bool isActive, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.green[600] : Colors.grey[200],
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isActive ? Colors.green[600]! : Colors.grey[300]!),
+        ),
+        child: Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: isActive ? Colors.white : Colors.grey[800], fontSize: 13)),
+      ),
     );
   }
 

@@ -9,6 +9,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../utils/ux_helper.dart';
 
 class DetailSuratScreen extends StatefulWidget {
   final String id;
@@ -119,18 +120,49 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
 
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✓ Surat berhasil diajukan ke RT'), backgroundColor: Colors.green),
-        );
-        // Reload data
+        UxHelper.showSuccess(context, 'Surat berhasil diajukan ke RT');
         _loadSurat();
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Gagal upload: $e'), backgroundColor: Colors.red),
-        );
+        UxHelper.showError(context, 'Gagal upload: $e');
+      }
+    }
+  }
+
+  Future<void> _deleteSurat() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Hapus Surat?'),
+        content: Text('Surat draft akan dihapus selamanya. Tindakan ini tidak dapat dibatalkan.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Hapus', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      setState(() => _isLoading = true);
+      await _firestore.collection('surat').doc(widget.id).delete();
+      if (mounted) {
+        UxHelper.showSuccess(context, 'Surat berhasil dihapus');
+        Future.delayed(Duration(milliseconds: 800), () {
+          if (mounted) context.go('/dashboard/warga');
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        UxHelper.showError(context, 'Gagal hapus surat: $e');
       }
     }
   }
@@ -268,7 +300,8 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                   Text('Langkah Selanjutnya', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
                   SizedBox(height: 16),
                   
-                  if (!isAjukan) ...[
+                  if (status == 'draft') ...[
+                    // Untuk draft, tampilkan Download, Upload, Edit, Delete
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
                       icon: Icon(Icons.download),
@@ -285,7 +318,31 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                       label: Text('Upload Foto Surat TTD & Ajukan', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                       onPressed: _uploadFotoTTD,
                     ),
-                  ] else ...[
+                    SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: Colors.orange.shade600,
+                      ),
+                      icon: Icon(Icons.edit),
+                      label: Text('Edit Surat', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      onPressed: () {
+                        // TODO: Implementasi edit surat
+                        UxHelper.showInfo(context, 'Fitur edit sedang dikembangkan');
+                      },
+                    ),
+                    SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: Colors.red.shade600,
+                      ),
+                      icon: Icon(Icons.delete),
+                      label: Text('Hapus Surat', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      onPressed: _deleteSurat,
+                    ),
+                  ] else if (status == 'diajukan') ...[
+                    // Untuk sudah diajukan
                     Container(
                       padding: EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -304,8 +361,34 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                       ),
                     ),
                     SizedBox(height: 12),
-                    // If current user is RT/RW, show approve/reject controls
-                    if (_myRole != null && ( _myRole == 'rt' || _myRole == 'rw' || _myRole == 'rt_rw')) ...[
+                  ] else ...[
+                    // Untuk status yang sudah di-acc atau ditolak
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        border: Border.all(color: Colors.blue.shade700),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('ℹ️ Surat sedang diproses', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.w600)),
+                          SizedBox(height: 8),
+                          Text('Surat Anda sedang diproses oleh RT/RW. Anda akan menerima pemberitahuan ketika surat telah disetujui atau ditolak.',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                  ],
+
+                  // Tampilkan approval controls untuk RT/RW/Kelurahan
+                  if (_myRole != null && (_myRole == 'rt' || _myRole == 'rw' || _myRole == 'rt_rw' || _myRole == 'kelurahan'))
+                    if ((_myRole == 'rt' && status == 'diajukan') ||
+                        (_myRole == 'rw' && status == 'acc_rt') ||
+                        (_myRole == 'rt_rw' && (status == 'diajukan' || status == 'acc_rt')) ||
+                        (_myRole == 'kelurahan' && status == 'acc_rw')) ...[
                       SizedBox(height: 8),
                       Row(
                         children: [
@@ -313,7 +396,6 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                             child: OutlinedButton(
                               style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
                               onPressed: () async {
-                                // Reject flow with reason
                                 String alasan = '';
                                 final ok = await showDialog<bool>(
                                   context: context,
@@ -334,12 +416,13 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                                     'ditolakOleh': FirebaseAuth.instance.currentUser!.uid,
                                     'tanggalDitolak': Timestamp.now(),
                                   });
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Surat ditolak')));
-                                  // reload and go back
+                                  if (mounted) UxHelper.showSuccess(context, 'Surat ditolak');
                                   await _loadSurat();
-                                  context.pop();
+                                  Future.delayed(Duration(milliseconds: 600), () {
+                                    if (mounted) context.pop();
+                                  });
                                 } catch (e) {
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal menolak surat: $e')));
+                                  if (mounted) UxHelper.showError(context, 'Gagal menolak surat: $e');
                                 }
                               },
                               child: Text('Tolak', style: TextStyle(color: Colors.red)),
@@ -350,28 +433,32 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14), backgroundColor: Colors.green.shade700),
                               onPressed: () async {
-                                // Approve flow
                                 final confirm = await showDialog<bool>(
                                   context: context,
                                   builder: (context) => AlertDialog(
                                     title: Text('Konfirmasi Terima'),
-                                    content: Text('Terima surat ini? Setelah diterima, status akan diperbarui.'),
-                                    actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Batal')), ElevatedButton(onPressed: () => Navigator.pop(context, true), child: Text('Terima'))],
+                                    content: Text('Terima surat ini?'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Batal')),
+                                      ElevatedButton(onPressed: () => Navigator.pop(context, true), child: Text('Terima'))
+                                    ],
                                   ),
                                 );
                                 if (confirm != true) return;
                                 try {
-                                  final newStatus = _myRole == 'rw' ? 'acc_rw' : 'acc_rt';
+                                  final newStatus = _myRole == 'rw' ? 'acc_rw' : _myRole == 'kelurahan' ? 'acc_kelurahan' : 'acc_rt';
                                   await _firestore.collection('surat').doc(widget.id).update({
                                     'status': newStatus,
                                     'approvedBy': FirebaseAuth.instance.currentUser!.uid,
                                     'tanggalAcc': Timestamp.now(),
                                   });
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Surat diterima')));
+                                  if (mounted) UxHelper.showSuccess(context, 'Surat diterima');
                                   await _loadSurat();
-                                  context.pop();
+                                  Future.delayed(Duration(milliseconds: 600), () {
+                                    if (mounted) context.pop();
+                                  });
                                 } catch (e) {
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal menerima surat: $e')));
+                                  if (mounted) UxHelper.showError(context, 'Gagal menerima surat: $e');
                                 }
                               },
                               child: Text('Terima'),
@@ -380,27 +467,22 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                         ],
                       ),
                     ],
-                    if (data['urlSuratTtd'] != null)
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
-                        icon: Icon(Icons.visibility),
-                        label: Text('Lihat Foto Surat TTD', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                        onPressed: () async {
-                          final url = data['urlSuratTtd'];
-                          if (await canLaunchUrl(Uri.parse(url))) {
-                            await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-                          }
-                        },
-                      ),
+                  
+                  if (data['urlSuratTtd'] != null) ...[
+                    SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
+                      icon: Icon(Icons.visibility),
+                      label: Text('Lihat Foto Surat TTD', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      onPressed: () async {
+                        final url = data['urlSuratTtd'];
+                        if (await canLaunchUrl(Uri.parse(url))) {
+                          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                        }
+                      },
+                    ),
                   ],
 
-                  SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
-                    icon: Icon(Icons.arrow_back),
-                    label: Text('Kembali ke Beranda', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                    onPressed: () => context.go('/dashboard/warga'),
-                  ),
                   SizedBox(height: 32),
                 ],
               ),

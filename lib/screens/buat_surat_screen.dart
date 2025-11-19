@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../utils/ux_helper.dart';
+import '../utils/validation_helper.dart';
 
 class BuatSuratScreen extends StatefulWidget {
   @override
@@ -149,36 +151,172 @@ class _BuatSuratScreenState extends State<BuatSuratScreen> {
 
   Future<void> _generatePDF() async {
     if (selectedPemohon == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pilih pemohon')));
+      UxHelper.showError(context, 'Pilih pemohon terlebih dahulu');
       return;
     }
 
     final pdf = pw.Document();
+    
     final nama = selectedPemohon!['nama'] ?? 'N/A';
     final nik = selectedPemohon!['nik'] ?? 'N/A';
+    final tempatLahir = selectedPemohon!['tempatLahir'] ?? 'N/A';
+    final tglLahir = selectedPemohon!['tanggalLahir'] ?? 'N/A';
+    final jenisKelamin = selectedPemohon!['jenisKelamin'] ?? 'N/A';
+    final pekerjaan = selectedPemohon!['pekerjaan'] ?? 'N/A';
     final alamat = selectedPemohon!['alamat'] ?? 'N/A';
+    final rt = selectedPemohon!['rt'] ?? 'N/A';
+    final rw = selectedPemohon!['rw'] ?? 'N/A';
+    
     final tglPengajuan = DateFormat('dd MMMM yyyy').format(DateTime.now());
 
     pdf.addPage(pw.Page(
       pageFormat: PdfPageFormat.a4,
+      margin: pw.EdgeInsets.all(20),
       build: (pw.Context context) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Center(child: pw.Text('SURAT KETERANGAN', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold))),
+          // Header - Judul Surat
+          pw.Center(
+            child: pw.Column(
+              children: [
+                pw.Text(
+                  'SURAT PENGANTAR RT/RW',
+                  style: pw.TextStyle(
+                    fontSize: 18,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  'Kelurahan Sukorame',
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 16),
+          pw.Divider(),
+          pw.SizedBox(height: 16),
+
+          // Kalimat Pembuka
+          pw.Text(
+            'Yang bertanda tangan di bawah ini, penduduk Kelurahan Sukorame menerangkan bahwa:',
+            style: pw.TextStyle(
+              fontSize: 11,
+              height: 1.5,
+            ),
+          ),
+          pw.SizedBox(height: 16),
+
+          // Data Pemohon
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              _buildPdfField('Nama', nama),
+              _buildPdfField('Jenis Kelamin', jenisKelamin),
+              _buildPdfField('Tempat Lahir', tempatLahir),
+              _buildPdfField('Tanggal Lahir', tglLahir),
+              _buildPdfField('Pekerjaan', pekerjaan),
+              _buildPdfField('Alamat', alamat),
+              _buildPdfField('RT', rt),
+              _buildPdfField('RW', rw),
+              _buildPdfField('NIK', nik),
+              _buildPdfField('Kategori Surat', kategori),
+              _buildPdfField('Keperluan', keperluan),
+            ],
+          ),
           pw.SizedBox(height: 20),
-          pw.Text('Kategori: $kategori'),
-          pw.Text('Pemohon: $nama'),
-          pw.Text('NIK: $nik'),
-          pw.Text('Alamat: $alamat'),
-          pw.Text('Keperluan: $keperluan'),
-          pw.Text('Tanggal: $tglPengajuan'),
-          pw.SizedBox(height: 40),
-          pw.Text('Tanda Tangan: _______________________'),
+
+          // Pernyataan
+          pw.Text(
+            'Demikian surat pengantar ini diberikan kepada yang bersangkutan untuk digunakan sesuai dengan keperluan.',
+            style: pw.TextStyle(
+              fontSize: 11,
+              height: 1.5,
+            ),
+          ),
+          pw.SizedBox(height: 32),
+
+          // Tempat dan Tanggal
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.end,
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'Sukorame, $tglPengajuan',
+                    style: pw.TextStyle(fontSize: 11),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 32),
+
+          // Area Tanda Tangan Pemohon
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.end,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Text(
+                    'Pemohon,',
+                    style: pw.TextStyle(fontSize: 11),
+                  ),
+                  pw.SizedBox(height: 50),
+                  pw.Text(
+                    '(___________________)',
+                    style: pw.TextStyle(fontSize: 11),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    nama,
+                    style: pw.TextStyle(fontSize: 10),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     ));
 
     await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
+  }
+
+  // Helper untuk membuat field di PDF
+  pw.Widget _buildPdfField(String label, String value) {
+    return pw.Padding(
+      padding: pw.EdgeInsets.only(bottom: 8),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Container(
+            width: 120,
+            child: pw.Text(
+              label,
+              style: pw.TextStyle(
+                fontSize: 10,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+          ),
+          pw.Text(': '),
+          pw.Expanded(
+            child: pw.Text(
+              value,
+              style: pw.TextStyle(fontSize: 10),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _buatSurat() async {
@@ -199,12 +337,15 @@ class _BuatSuratScreenState extends State<BuatSuratScreen> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✓ Surat dibuat'), backgroundColor: Colors.green));
-        context.push('/detail-surat/${suratRef.id}');
+        UxHelper.showSuccess(context, 'Surat dibuat');
+        Future.delayed(Duration(milliseconds: 800), () {
+          if (mounted) context.push('/detail-surat/${suratRef.id}');
+        });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        final errorMsg = ValidationHelper.getErrorMessage(e as Exception);
+        UxHelper.showError(context, errorMsg);
       }
     }
   }
@@ -227,7 +368,7 @@ class _BuatSuratScreenState extends State<BuatSuratScreen> {
             Text('1. Detail Surat', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
             SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: kategori,
+              initialValue: kategori,
               decoration: InputDecoration(labelText: 'Kategori *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.description)),
               items: ['Surat Keterangan Usaha', 'Surat Pengantar Nikah', 'Surat Keterangan Tidak Mampu', 'Surat Domisili']
                   .map((e) => DropdownMenuItem(value: e, child: Text(e)))
