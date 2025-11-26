@@ -112,9 +112,12 @@ class _TambahAnggotaScreenState extends State<TambahAnggotaScreen> {
       try {
         final uid = FirebaseAuth.instance.currentUser!.uid;
         final doc = await _firestore.collection('users').doc(uid).get();
-        List<Map<String, dynamic>> anggota = List.from(
-          doc['anggotaKeluarga'] ?? [],
-        );
+
+        // Handle jika field anggotaKeluarga tidak ada
+        List<Map<String, dynamic>> anggota = [];
+        if (doc.exists && doc.data()?.containsKey('anggotaKeluarga') == true) {
+          anggota = List.from(doc['anggotaKeluarga'] ?? []);
+        }
 
         // Cek duplikasi NIK
         final nikExists = anggota.any((a) => a['nik'] == nik);
@@ -193,11 +196,14 @@ class _TambahAnggotaScreenState extends State<TambahAnggotaScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // ===== DATA ANGGOTA SECTION =====
               Text(
                 'Data Anggota',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 16),
+
+              // Nama
               TextFormField(
                 decoration: InputDecoration(
                   labelText: 'Nama',
@@ -207,6 +213,8 @@ class _TambahAnggotaScreenState extends State<TambahAnggotaScreen> {
                 onChanged: (val) => nama = val,
               ),
               SizedBox(height: 12),
+
+              // NIK
               TextFormField(
                 decoration: InputDecoration(
                   labelText: 'NIK (16 digit)',
@@ -215,10 +223,7 @@ class _TambahAnggotaScreenState extends State<TambahAnggotaScreen> {
                   helperText: 'Masukkan 16 angka',
                 ),
                 keyboardType: TextInputType.number,
-                inputFormatters: [
-                  // Hanya terima angka
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 maxLength: 16,
                 validator: (val) {
                   if (val == null || val.isEmpty) {
@@ -233,42 +238,383 @@ class _TambahAnggotaScreenState extends State<TambahAnggotaScreen> {
                 onChanged: (val) => nik = val,
               ),
               SizedBox(height: 12),
+
+              // Hubungan
               DropdownButtonFormField<String>(
                 decoration: InputDecoration(
                   labelText: 'Hubungan',
                   border: OutlineInputBorder(),
                 ),
-                items: ['Istri', 'Anak', 'Orang Tua']
+                initialValue: hubungan.isEmpty ? null : hubungan,
+                items:
+                    [
+                          'Istri',
+                          'Suami',
+                          'Anak',
+                          'Orang Tua',
+                          'Saudara',
+                          'Lainnya',
+                        ]
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
+                validator: (val) => val == null || val.isEmpty
+                    ? 'Hubungan wajib dipilih'
+                    : null,
+                onChanged: (val) => setState(() => hubungan = val ?? ''),
+              ),
+              SizedBox(height: 12),
+
+              // Tempat Lahir
+              TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Tempat Lahir',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) => val!.isEmpty ? 'Wajib' : null,
+                onChanged: (val) => tempatLahir = val,
+              ),
+              SizedBox(height: 12),
+
+              // Tanggal Lahir
+              GestureDetector(
+                onTap: () async {
+                  final pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(1950),
+                    lastDate: DateTime.now(),
+                  );
+                  if (pickedDate != null) {
+                    setState(() {
+                      tanggalLahir =
+                          '${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}';
+                    });
+                  }
+                },
+                child: TextFormField(
+                  enabled: false,
+                  decoration: InputDecoration(
+                    labelText: 'Tanggal Lahir',
+                    border: OutlineInputBorder(),
+                    suffixIcon: Icon(Icons.calendar_today),
+                  ),
+                  controller: TextEditingController(
+                    text: tanggalLahir.isEmpty ? '' : tanggalLahir,
+                  ),
+                  validator: (val) => tanggalLahir.isEmpty ? 'Wajib' : null,
+                ),
+              ),
+              SizedBox(height: 12),
+
+              // Jenis Kelamin
+              DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: 'Jenis Kelamin',
+                  border: OutlineInputBorder(),
+                ),
+                initialValue: jenisKelamin.isEmpty ? null : jenisKelamin,
+                items: ['Laki-laki', 'Perempuan']
                     .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                     .toList(),
-                onChanged: (val) => setState(() => hubungan = val!),
+                validator: (val) =>
+                    val == null || val.isEmpty ? 'Wajib dipilih' : null,
+                onChanged: (val) => setState(() => jenisKelamin = val ?? ''),
+              ),
+              SizedBox(height: 12),
+
+              // Agama
+              DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: 'Agama',
+                  border: OutlineInputBorder(),
+                ),
+                initialValue: agama.isEmpty ? null : agama,
+                items:
+                    [
+                          'Islam',
+                          'Kristen',
+                          'Katolik',
+                          'Hindu',
+                          'Buddha',
+                          'Konghucu',
+                        ]
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
+                validator: (val) =>
+                    val == null || val.isEmpty ? 'Wajib dipilih' : null,
+                onChanged: (val) => setState(() => agama = val ?? ''),
+              ),
+              SizedBox(height: 12),
+
+              // Status Perkawinan
+              DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: 'Status Perkawinan',
+                  border: OutlineInputBorder(),
+                ),
+                initialValue: statusPerkawinan.isEmpty ? null : statusPerkawinan,
+                items: ['Belum Kawin', 'Kawin', 'Cerai Hidup', 'Cerai Mati']
+                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                    .toList(),
+                validator: (val) =>
+                    val == null || val.isEmpty ? 'Wajib dipilih' : null,
+                onChanged: (val) =>
+                    setState(() => statusPerkawinan = val ?? ''),
+              ),
+              SizedBox(height: 12),
+
+              // Pekerjaan
+              TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Pekerjaan',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) => val!.isEmpty ? 'Wajib' : null,
+                onChanged: (val) => pekerjaan = val,
+              ),
+              SizedBox(height: 12),
+
+              // Status di Keluarga
+              DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: 'Status di Keluarga',
+                  border: OutlineInputBorder(),
+                ),
+                initialValue: statusDiKeluarga.isEmpty ? null : statusDiKeluarga,
+                items:
+                    ['Kepala Keluarga', 'Istri', 'Anak', 'Orang Tua', 'Lainnya']
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
+                validator: (val) =>
+                    val == null || val.isEmpty ? 'Wajib dipilih' : null,
+                onChanged: (val) =>
+                    setState(() => statusDiKeluarga = val ?? ''),
+              ),
+              SizedBox(height: 12),
+
+              // Kewarganegaraan
+              DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: 'Kewarganegaraan',
+                  border: OutlineInputBorder(),
+                ),
+                initialValue: kewarganegaraan.isEmpty ? 'NKRI' : kewarganegaraan,
+                items: ['NKRI', 'Asing']
+                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                    .toList(),
+                onChanged: (val) =>
+                    setState(() => kewarganegaraan = val ?? 'NKRI'),
+              ),
+              SizedBox(height: 12),
+
+              // No HP
+              TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'No. HP',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.phone),
+                ),
+                keyboardType: TextInputType.phone,
+                onChanged: (val) => noHp = val,
+              ),
+              SizedBox(height: 16),
+
+              // ===== ALAMAT SECTION =====
+              Text(
+                'Alamat',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 16),
+
+              // Alamat
+              TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Alamat',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
+                validator: (val) => val!.isEmpty ? 'Wajib' : null,
+                onChanged: (val) => alamat = val,
+              ),
+              SizedBox(height: 12),
+
+              // RT
+              DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: 'RT',
+                  border: OutlineInputBorder(),
+                ),
+                initialValue: rt.isEmpty ? null : rt,
+                items: List.generate(
+                  37,
+                  (index) => DropdownMenuItem(
+                    value: '${index + 1}',
+                    child: Text('${index + 1}'),
+                  ),
+                ),
+                validator: (val) =>
+                    val == null || val.isEmpty ? 'RT wajib dipilih' : null,
+                onChanged: (val) => setState(() => rt = val ?? ''),
+              ),
+              SizedBox(height: 12),
+
+              // RW
+              DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: 'RW',
+                  border: OutlineInputBorder(),
+                ),
+                initialValue: rw.isEmpty ? null : rw,
+                items: List.generate(
+                  10,
+                  (index) => DropdownMenuItem(
+                    value: '${index + 1}',
+                    child: Text('${index + 1}'),
+                  ),
+                ),
+                validator: (val) =>
+                    val == null || val.isEmpty ? 'RW wajib dipilih' : null,
+                onChanged: (val) => setState(() => rw = val ?? ''),
+              ),
+              SizedBox(height: 12),
+
+              // Kelurahan
+              TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Kelurahan',
+                  border: OutlineInputBorder(),
+                ),
+                initialValue: kelurahan,
+                onChanged: (val) => kelurahan = val,
+              ),
+              SizedBox(height: 12),
+
+              // Kecamatan
+              TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Kecamatan',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) => val!.isEmpty ? 'Wajib' : null,
+                onChanged: (val) => kecamatan = val,
+              ),
+              SizedBox(height: 12),
+
+              // Kota
+              TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Kota/Kabupaten',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) => val!.isEmpty ? 'Wajib' : null,
+                onChanged: (val) => kota = val,
+              ),
+              SizedBox(height: 12),
+
+              // Provinsi
+              TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Provinsi',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) => val!.isEmpty ? 'Wajib' : null,
+                onChanged: (val) => provinsi = val,
               ),
               SizedBox(height: 24),
+
+              // ===== DOKUMEN SECTION =====
+              Text(
+                'Dokumen',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 16),
+
               Row(
                 children: [
                   Expanded(
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
                       onPressed: () => _uploadFoto('kk'),
-                      child: Text('Upload Foto KK'),
+                      icon: Icon(Icons.image),
+                      label: Text('Foto KK'),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                      ),
                     ),
                   ),
                   SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
                       onPressed: () => _uploadFoto('ktp'),
-                      child: Text('Upload Foto KTP'),
+                      icon: Icon(Icons.image),
+                      label: Text('Foto KTP'),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                      ),
                     ),
                   ),
                 ],
               ),
+
+              if (urlFotoKk != null) ...[
+                SizedBox(height: 12),
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    border: Border.all(color: Colors.green.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green),
+                      SizedBox(width: 8),
+                      Text(
+                        'Foto KK sudah diupload',
+                        style: TextStyle(color: Colors.green.shade700),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              if (urlFotoKtp != null) ...[
+                SizedBox(height: 12),
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    border: Border.all(color: Colors.green.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green),
+                      SizedBox(width: 8),
+                      Text(
+                        'Foto KTP sudah diupload',
+                        style: TextStyle(color: Colors.green.shade700),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               SizedBox(height: 32),
+
+              // Simpan Button
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: Color(0xFF27AE60),
                 ),
                 onPressed: _saveAnggota,
-                child: Text('Simpan Anggota'),
+                child: Text(
+                  'Simpan Anggota',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
               ),
+
+              SizedBox(height: 16),
             ],
           ),
         ),

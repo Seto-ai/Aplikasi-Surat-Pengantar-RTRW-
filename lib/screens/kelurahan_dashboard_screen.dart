@@ -10,16 +10,16 @@ class KelurahanDashboardScreen extends StatefulWidget {
   const KelurahanDashboardScreen({super.key});
 
   @override
-  State<KelurahanDashboardScreen> createState() => _KelurahanDashboardScreenState();
+  State<KelurahanDashboardScreen> createState() =>
+      _KelurahanDashboardScreenState();
 }
 
 class _KelurahanDashboardScreenState extends State<KelurahanDashboardScreen> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 0; // Reset to default Beranda tab
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   String? _currentUserName;
-  String? _kelurahan;
 
   @override
   void initState() {
@@ -34,7 +34,6 @@ class _KelurahanDashboardScreenState extends State<KelurahanDashboardScreen> {
       if (doc.exists) {
         setState(() {
           _currentUserName = doc['nama'] ?? 'User';
-          _kelurahan = doc['kelurahan'];
         });
       }
     } catch (e) {
@@ -91,12 +90,12 @@ class _KelurahanDashboardScreenState extends State<KelurahanDashboardScreen> {
           body: _selectedIndex == 0
               ? _buildBerandaTab()
               : _selectedIndex == 1
-                  ? _buildLihatWargaTab()
-                  : _selectedIndex == 2
-                      ? _buildManajemenRTRWTab()
-                      : _selectedIndex == 3
-                          ? _buildRekrutTab()
-                          : _buildAkunTab(),
+              ? _buildLihatWargaTab()
+              : _selectedIndex == 2
+              ? _buildManajemenRTRWTab()
+              : _selectedIndex == 3
+              ? _buildRekrutTab()
+              : _buildAkunTab(),
           bottomNavigationBar: BottomNavigationBar(
             backgroundColor: Colors.white,
             selectedItemColor: Colors.green.shade700,
@@ -140,10 +139,7 @@ class _KelurahanDashboardScreenState extends State<KelurahanDashboardScreen> {
             value: 'id',
             child: Text('🇮🇩 Indonesian'),
           ),
-          const PopupMenuItem<String>(
-            value: 'en',
-            child: Text('🇬🇧 English'),
-          ),
+          const PopupMenuItem<String>(value: 'en', child: Text('🇬🇧 English')),
         ];
       },
       onSelected: (String locale) {
@@ -213,7 +209,7 @@ class _BerandaTabKelurahanState extends State<BerandaTabKelurahan> {
       'draft': 'Draft',
       'diajukan': 'Menunggu Persetujuan RT',
       'acc_rt': 'Disetujui RT, Menunggu RW',
-      'acc_rw': 'Disetujui RW, Menunggu Kelurahan',
+      'acc_rw': 'Disetujui RW',
       'acc_kelurahan': 'Disetujui',
       'ditolak': 'Ditolak',
     };
@@ -250,7 +246,9 @@ class _BerandaTabKelurahanState extends State<BerandaTabKelurahan> {
                   decoration: InputDecoration(
                     hintText: 'Cari surat...',
                     prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                   onChanged: (val) {
@@ -265,10 +263,6 @@ class _BerandaTabKelurahanState extends State<BerandaTabKelurahan> {
                       _buildSortChip('Terbaru', 'newest', setState),
                       const SizedBox(width: 8),
                       _buildSortChip('Terlama', 'oldest', setState),
-                      const SizedBox(width: 8),
-                      _buildSortChip('Disetujui', 'approved', setState),
-                      const SizedBox(width: 8),
-                      _buildSortChip('Ditolak', 'rejected', setState),
                     ],
                   ),
                 ),
@@ -281,7 +275,11 @@ class _BerandaTabKelurahanState extends State<BerandaTabKelurahan> {
     );
   }
 
-  Widget _buildSortChip(String label, String value, Function(VoidCallback) setState) {
+  Widget _buildSortChip(
+    String label,
+    String value,
+    Function(VoidCallback) setState,
+  ) {
     final isSelected = _sortBy == value;
     return FilterChip(
       label: Text(label),
@@ -299,8 +297,10 @@ class _BerandaTabKelurahanState extends State<BerandaTabKelurahan> {
   }
 
   Widget _buildSuratListStream() {
-    // Kelurahan hanya lihat surat yang sudah acc_rw (tahap final)
-    Query query = _firestore.collection('surat').where('status', isEqualTo: 'acc_rw');
+    // Kelurahan lihat surat yang sudah acc_rw (tahap final) dan yang sudah acc_kelurahan atau ditolak
+    Query query = _firestore
+        .collection('surat')
+        .where('status', whereIn: ['acc_rw', 'acc_kelurahan', 'ditolak']);
 
     return StreamBuilder<QuerySnapshot>(
       stream: query.snapshots(),
@@ -315,17 +315,25 @@ class _BerandaTabKelurahanState extends State<BerandaTabKelurahan> {
 
         var docs = snapshot.data!.docs;
 
-        // Sort
+        // Sort based on selected filter
         if (_sortBy == 'oldest') {
           docs.sort((a, b) {
-            final aTime = (a['tanggalPengajuan'] as Timestamp?)?.toDate() ?? DateTime(1970);
-            final bTime = (b['tanggalPengajuan'] as Timestamp?)?.toDate() ?? DateTime(1970);
+            final aTime =
+                (a['tanggalPengajuan'] as Timestamp?)?.toDate() ??
+                DateTime(1970);
+            final bTime =
+                (b['tanggalPengajuan'] as Timestamp?)?.toDate() ??
+                DateTime(1970);
             return aTime.compareTo(bTime);
           });
         } else if (_sortBy == 'newest') {
           docs.sort((a, b) {
-            final aTime = (a['tanggalPengajuan'] as Timestamp?)?.toDate() ?? DateTime(1970);
-            final bTime = (b['tanggalPengajuan'] as Timestamp?)?.toDate() ?? DateTime(1970);
+            final aTime =
+                (a['tanggalPengajuan'] as Timestamp?)?.toDate() ??
+                DateTime(1970);
+            final bTime =
+                (b['tanggalPengajuan'] as Timestamp?)?.toDate() ??
+                DateTime(1970);
             return bTime.compareTo(aTime);
           });
         }
@@ -334,14 +342,14 @@ class _BerandaTabKelurahanState extends State<BerandaTabKelurahan> {
           final data = doc.data() as Map<String, dynamic>;
           final namaPemohon = (data['namaPemohon'] as String?) ?? '';
           final keperluan = (data['keperluan'] as String?) ?? '';
-          
+
           if (_searchQuery.isEmpty) return true;
           return namaPemohon.toLowerCase().contains(_searchQuery) ||
               keperluan.toLowerCase().contains(_searchQuery);
         }).toList();
 
         if (filtered.isEmpty) {
-          return const Center(child: Text('Tidak ada surat masuk'));
+          return const Center(child: Text('Tidak ada surat'));
         }
 
         return ListView.builder(
@@ -419,42 +427,220 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
   Future<void> _loadData() async {
     try {
       setState(() => _isLoading = true);
-      
-      // Load all RW
-      final rwSnapshot = await _firestore
+
+      // Load all RT users to get RW numbers and RT mapping
+      final rtUsersSnapshot = await _firestore
           .collection('users')
-          .where('role', isEqualTo: 'rw')
+          .where('role', isEqualTo: 'rt')
           .get();
-      
-      _rwList = rwSnapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+
+      final rtUsers = rtUsersSnapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList();
+
+      print('[DEBUG] Loaded ${rtUsers.length} RT users from users collection');
+
+      // Extract unique RW numbers from RT users (rw field)
+      final uniqueRWNumbers = <String>{};
+      for (var rtUser in rtUsers) {
+        final rwNum = rtUser['rw']?.toString();
+        if (rwNum != null) {
+          uniqueRWNumbers.add(rwNum);
+        }
+      }
+
+      print(
+        '[DEBUG] Found ${uniqueRWNumbers.length} unique RW numbers: $uniqueRWNumbers',
+      );
+
+      // Also load all RT from collection 'rt' to get RT ketua data
+      final rtFromCollSnapshot = await _firestore.collection('rt').get();
+      final allRTs = rtFromCollSnapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList();
+      print('[DEBUG] Loaded ${allRTs.length} total RT from collection rt');
+
+      // Build RW list from collection 'rw' with nomor_rw field
+      // RW data stored in collection 'rw' with uid, nama, nomor_rw, etc.
+      _rwList = [];
+      for (var rwNum in uniqueRWNumbers) {
+        // Query collection 'rw' with nomor_rw field (convert to int for comparison)
+        final rwSnapshot = await _firestore
+            .collection('rw')
+            .where('nomor_rw', isEqualTo: int.tryParse(rwNum) ?? rwNum)
+            .limit(1)
+            .get();
+
+        Map<String, dynamic> rwDoc = {
+          'rw': rwNum,
+          'nama': 'RW $rwNum',
+          'id': 'rw_$rwNum',
+        };
+
+        if (rwSnapshot.docs.isNotEmpty) {
+          final rwData = rwSnapshot.docs.first;
+          final ketuaNama = rwData['nama'];
+          final ketuaUid = rwData['uid'] ?? '';
+
+          print(
+            '[DEBUG] RW $rwNum found in collection rw - nama: "$ketuaNama", uid: "$ketuaUid"',
+          );
+
+          // If nama is empty/null, try fallback to users collection with role='rw'
+          if (ketuaNama == null || ketuaNama.isEmpty) {
+            print(
+              '[DEBUG] RW $rwNum has empty nama, trying users collection with role=rw',
+            );
+            final rwUserSnapshot = await _firestore
+                .collection('users')
+                .where('role', isEqualTo: 'rw')
+                .where('rw', isEqualTo: rwNum)
+                .limit(1)
+                .get();
+            if (rwUserSnapshot.docs.isNotEmpty) {
+              final rwUserData = rwUserSnapshot.docs.first;
+              final fallbackNama = rwUserData['nama'] ?? 'RW $rwNum';
+              rwDoc = {
+                'id': rwData.id,
+                'rw': rwNum,
+                'nama': fallbackNama,
+                'uid': rwUserData['uid'] ?? ketuaUid,
+              };
+              print(
+                '[DEBUG] Found fallback RW $rwNum from users: $fallbackNama',
+              );
+            } else {
+              rwDoc = {
+                'id': rwData.id,
+                'rw': rwNum,
+                'nama': 'RW $rwNum',
+                'uid': ketuaUid,
+              };
+              print(
+                '[DEBUG] No fallback found for RW $rwNum, using default name',
+              );
+            }
+          } else {
+            rwDoc = {
+              'id': rwData.id,
+              'rw': rwNum,
+              'nama': ketuaNama,
+              'uid': ketuaUid,
+            };
+            print('[DEBUG] Using RW $rwNum ketua: $ketuaNama');
+          }
+        } else {
+          print(
+            '[DEBUG] No ketua RW record found for nomor_rw=$rwNum in rw collection. Trying from users collection with role=rw',
+          );
+          // Fallback: try to find from users collection with role='rw'
+          final rwUserSnapshot = await _firestore
+              .collection('users')
+              .where('role', isEqualTo: 'rw')
+              .where('rw', isEqualTo: rwNum)
+              .limit(1)
+              .get();
+          if (rwUserSnapshot.docs.isNotEmpty) {
+            final rwUserData = rwUserSnapshot.docs.first;
+            final ketuaNama = rwUserData['nama'] ?? 'RW $rwNum';
+            rwDoc['nama'] = ketuaNama;
+            rwDoc['uid'] = rwUserData['uid'] ?? '';
+            print(
+              '[DEBUG] Found ketua RW $rwNum from users collection: $ketuaNama',
+            );
+          }
+        }
+
+        _rwList.add(rwDoc);
+      }
+
+      // Sort RW by nomor_rw (1-10)
+      _rwList.sort((a, b) {
+        final aNum = int.tryParse(a['rw']?.toString() ?? '0') ?? 0;
+        final bNum = int.tryParse(b['rw']?.toString() ?? '0') ?? 0;
+        return aNum.compareTo(bNum);
+      });
+
+      print('[DEBUG] Total RW after merging: ${_rwList.length}');
+      for (var rw in _rwList) {
+        print('[DEBUG] RW: ${rw['rw']} - ${rw['nama']}');
+      }
+
+      // Load all warga once
+      final allWargaSnapshot = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: 'warga')
+          .get();
+      final allWarga = allWargaSnapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList();
+
+      print('[DEBUG] Loaded ${allWarga.length} total warga');
+      for (var w in allWarga) {
+        print('[DEBUG] Warga: ${w['nama']}, RT: ${w['rt']}, RW: ${w['rw']}');
+      }
 
       // Load RT for each RW
       for (var rw in _rwList) {
-        final rwNum = rw['rw'];
+        final rwNum = rw['rw']?.toString();
         if (rwNum == null) continue;
-        
-        final rtSnapshot = await _firestore
-            .collection('users')
-            .where('rw', isEqualTo: rwNum)
-            .where('role', isEqualTo: 'rt')
-            .get();
-        _rtByRW[rwNum] = rtSnapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
 
-        // Load warga for each RT
-        for (var rt in _rtByRW[rwNum]!) {
-          final rtNum = rt['rt'];
+        // Filter RT for this RW: get RT users with matching rw field
+        final rtList = rtUsers
+            .where((rtUser) => rtUser['rw']?.toString() == rwNum)
+            .map((rtUser) {
+              // Get matching RT from collection
+              final rtNum = rtUser['rt']?.toString();
+              final rtFromCollection = allRTs.firstWhere(
+                (rt) => rt['nomor_rt']?.toString() == rtNum,
+                orElse: () => {
+                  'nomor_rt': rtNum,
+                  'nama': 'RT $rtNum',
+                  'uid': '',
+                },
+              );
+              return {...rtUser, ...rtFromCollection};
+            })
+            .toList();
+
+        print('[DEBUG] Loaded ${rtList.length} RT for RW $rwNum');
+
+        // Sort RT by rt/nomor_rt (1-37)
+        rtList.sort((a, b) {
+          final aNum =
+              int.tryParse(
+                a['rt']?.toString() ?? a['nomor_rt']?.toString() ?? '0',
+              ) ??
+              0;
+          final bNum =
+              int.tryParse(
+                b['rt']?.toString() ?? b['nomor_rt']?.toString() ?? '0',
+              ) ??
+              0;
+          return aNum.compareTo(bNum);
+        });
+
+        _rtByRW[rwNum] = rtList;
+
+        // Filter warga for each RT from the allWarga list
+        for (var rt in rtList) {
+          final rtNum = rt['rt']?.toString() ?? rt['nomor_rt']?.toString();
           if (rtNum == null) continue;
-          
-          try {
-            final wargaSnapshot = await _firestore
-                .collection('users')
-                .where('rt', isEqualTo: rtNum)
-                .where('role', isEqualTo: 'warga')
-                .get();
-            _wargaByRT[rtNum] = wargaSnapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
-          } catch (e) {
-            print('Error loading warga for RT $rtNum: $e');
+
+          // Filter warga yang memiliki rt dan rw yang sama
+          final wargaList = allWarga.where((warga) {
+            final wargaRT = warga['rt']?.toString();
+            final wargaRW = warga['rw']?.toString();
+            final match = wargaRT == rtNum && wargaRW == rwNum;
+            return match;
+          }).toList();
+
+          print('[DEBUG] RT $rtNum RW $rwNum: found ${wargaList.length} warga');
+          for (var w in wargaList) {
+            print('[DEBUG]   - ${w['nama']} (RT: ${w['rt']}, RW: ${w['rw']})');
           }
+
+          _wargaByRT[rtNum] = wargaList;
         }
       }
 
@@ -478,7 +664,7 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
       itemCount: _rwList.length,
       itemBuilder: (context, rwIndex) {
         final rw = _rwList[rwIndex];
-        final rwValue = rw['rw'];
+        final rwValue = rw['rw']?.toString() ?? '';
         final isRWExpanded = _expandedRWs.contains(rwValue);
         final rtList = _rtByRW[rwValue] ?? [];
 
@@ -486,10 +672,12 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
           children: [
             ListTile(
               title: Text(
-                'Ketua RW $rwValue - ${rw['nama'] ?? "N/A"}',
+                'Ketua RW $rwValue - ${rw['nama'] ?? "RW $rwValue"}',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              trailing: Icon(isRWExpanded ? Icons.expand_less : Icons.expand_more),
+              trailing: Icon(
+                isRWExpanded ? Icons.expand_less : Icons.expand_more,
+              ),
               onTap: () {
                 setState(() {
                   if (_expandedRWs.contains(rwValue)) {
@@ -503,7 +691,7 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
             ),
             if (isRWExpanded)
               ...rtList.map((rt) {
-                final rtValue = rt['rt'];
+                final rtValue = rt['rt']?.toString() ?? '';
                 final isRTExpanded = _expandedRTs.contains(rtValue);
                 final wargaList = _wargaByRT[rtValue] ?? [];
 
@@ -513,10 +701,12 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
                       padding: const EdgeInsets.only(left: 16),
                       child: ListTile(
                         title: Text(
-                          'Ketua RT $rtValue - ${rt['nama'] ?? "N/A"}',
+                          'Ketua RT $rtValue - ${rt['nama'] ?? "RT $rtValue"}',
                           style: const TextStyle(fontWeight: FontWeight.w500),
                         ),
-                        trailing: Icon(isRTExpanded ? Icons.expand_less : Icons.expand_more),
+                        trailing: Icon(
+                          isRTExpanded ? Icons.expand_less : Icons.expand_more,
+                        ),
                         onTap: () {
                           setState(() {
                             if (_expandedRTs.contains(rtValue)) {
@@ -530,10 +720,12 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
                       ),
                     ),
                     if (isRTExpanded)
-                      ...wargaList.map((warga) => Padding(
-                            padding: const EdgeInsets.only(left: 32),
-                            child: _buildWargaCard(warga),
-                          )),
+                      ...wargaList.map(
+                        (warga) => Padding(
+                          padding: const EdgeInsets.only(left: 32),
+                          child: _buildWargaCard(warga),
+                        ),
+                      ),
                   ],
                 );
               }),
@@ -544,6 +736,7 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
   }
 
   Widget _buildWargaCard(Map<String, dynamic> warga) {
+    final wargaId = warga['id'] ?? warga.keys.first;
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: ListTile(
@@ -552,9 +745,16 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
           child: const Icon(Icons.person, color: Colors.white),
         ),
         title: Text(warga['nama'] ?? 'N/A'),
-        subtitle: Text(warga['email'] ?? 'N/A', style: const TextStyle(fontSize: 12)),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-        onTap: () => context.push('/detail-akun?readOnly=true'),
+        subtitle: Text(
+          warga['email'] ?? 'N/A',
+          style: const TextStyle(fontSize: 12),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          size: 14,
+          color: Colors.grey,
+        ),
+        onTap: () => context.push('/detail-akun?readOnly=true&userId=$wargaId'),
       ),
     );
   }
@@ -589,15 +789,37 @@ class _ManajemenRTRWTabState extends State<ManajemenRTRWTab> {
           .collection('users')
           .where('role', whereIn: ['rt', 'rw', 'rt_rw'])
           .get();
-      
-      _rtRWActive = snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+
+      _rtRWActive = snapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList();
+
+      // Sort: RW first (1-10), then RT (1-37)
+      _rtRWActive.sort((a, b) {
+        final aRole = a['role']?.toString() ?? '';
+        final bRole = b['role']?.toString() ?? '';
+
+        // RW comes first
+        if (aRole == 'rw' && bRole != 'rw') return -1;
+        if (aRole != 'rw' && bRole == 'rw') return 1;
+
+        // Sort by number within same role
+        if (aRole == bRole) {
+          final field = aRole == 'rw' ? 'rw' : 'rt';
+          final aNum = int.tryParse(a[field]?.toString() ?? '0') ?? 0;
+          final bNum = int.tryParse(b[field]?.toString() ?? '0') ?? 0;
+          return aNum.compareTo(bNum);
+        }
+
+        return 0;
+      });
 
       // Load history (from riwayatRTRW collection)
-      final historySnapshot = await _firestore
-          .collection('riwayatRTRW')
-          .get();
-      
-      _rtRWHistory = historySnapshot.docs.map((doc) => {...doc.data()}).toList();
+      final historySnapshot = await _firestore.collection('riwayatRTRW').get();
+
+      _rtRWHistory = historySnapshot.docs
+          .map((doc) => {...doc.data()})
+          .toList();
 
       if (mounted) setState(() => _isLoading = false);
     } catch (e) {
@@ -629,10 +851,7 @@ class _ManajemenRTRWTabState extends State<ManajemenRTRWTab> {
           ),
           Expanded(
             child: TabBarView(
-              children: [
-                _buildActiveList(),
-                _buildHistoryList(),
-              ],
+              children: [_buildActiveList(), _buildHistoryList()],
             ),
           ),
         ],
@@ -662,7 +881,10 @@ class _ManajemenRTRWTabState extends State<ManajemenRTRWTab> {
 
         return Card(
           child: ListTile(
-            title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+            title: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
             subtitle: Text(person['nama'] ?? 'N/A'),
             trailing: const Icon(Icons.info_outline),
             onTap: () => context.push('/detail-akun?readOnly=true'),
@@ -682,12 +904,32 @@ class _ManajemenRTRWTabState extends State<ManajemenRTRWTab> {
       itemCount: _rtRWHistory.length,
       itemBuilder: (context, index) {
         final history = _rtRWHistory[index];
-        final periodeStr = '${history['periode_mulai']} s/d ${history['periode_akhir']}';
+        final periodeStr =
+            '${history['periode_mulai']} s/d ${history['periode_akhir']}';
+
+        // Build posisi string based on nomor_rt and nomor_rw
+        String posisiStr = '';
+        if (history['nomor_rt'] != null) {
+          posisiStr += 'RT ${history['nomor_rt']}';
+        }
+        if (history['nomor_rw'] != null) {
+          if (posisiStr.isNotEmpty) {
+            posisiStr += ' / RW ${history['nomor_rw']}';
+          } else {
+            posisiStr = 'RW ${history['nomor_rw']}';
+          }
+        }
+        if (posisiStr.isEmpty) {
+          posisiStr = 'N/A';
+        }
 
         return Card(
           child: ListTile(
-            title: Text(history['nama'] ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text('RW ${history['nomor_rw']}\n$periodeStr'),
+            title: Text(
+              history['nama'] ?? 'N/A',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text('$posisiStr\n$periodeStr'),
             isThreeLine: true,
           ),
         );
@@ -726,12 +968,12 @@ class _RekrutTabKelurahanState extends State<RekrutTabKelurahan> {
           .collection('users')
           .where('role', isEqualTo: 'rw')
           .get();
-      
+
       for (var rwDoc in rwSnapshot.docs) {
         final rwData = rwDoc.data();
         final rwValue = rwData['rw'];
         if (rwValue == null) continue;
-        
+
         // Check if there's any RT with this RW
         final rtCount = await _firestore
             .collection('users')
@@ -739,13 +981,13 @@ class _RekrutTabKelurahanState extends State<RekrutTabKelurahan> {
             .where('role', isEqualTo: 'rt')
             .count()
             .get();
-        
+
         if (rtCount.count == 0) {
           _warnings.add({
             'type': 'rw',
             'nomor': rwValue,
             'nama': rwData['nama'],
-            'message': 'RW $rwValue belum ada yang menjabat'
+            'message': 'RW $rwValue belum ada yang menjabat',
           });
         }
       }
@@ -753,7 +995,7 @@ class _RekrutTabKelurahanState extends State<RekrutTabKelurahan> {
       // Get all RT positions that don't have anyone
       final allRTs = await _firestore.collection('users').get();
       final allRTNumbers = <String>{};
-      
+
       for (var doc in allRTs.docs) {
         final data = doc.data();
         if (data.containsKey('rt')) {
@@ -772,12 +1014,12 @@ class _RekrutTabKelurahanState extends State<RekrutTabKelurahan> {
             .where('role', isEqualTo: 'rt')
             .count()
             .get();
-        
+
         if (rtExists.count == 0) {
           _warnings.add({
             'type': 'rt',
             'nomor': rt,
-            'message': 'RT $rt belum ada yang menjabat'
+            'message': 'RT $rt belum ada yang menjabat',
           });
         }
       }
@@ -855,12 +1097,17 @@ class _RekrutTabKelurahanState extends State<RekrutTabKelurahan> {
           warning['type'] == 'rw' ? Icons.warning : Icons.info,
           color: Colors.orange,
         ),
-        title: Text(warning['message'], style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Text(
+          warning['message'],
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
         subtitle: Text(warning['type'].toUpperCase()),
         trailing: const Icon(Icons.arrow_forward),
         onTap: () async {
           // Navigate to warga selection screen
-          final result = await context.push('/rekrut-kelurahan?type=${warning["type"]}&nomor=${warning["nomor"]}');
+          final result = await context.push(
+            '/rekrut-kelurahan?type=${warning["type"]}&nomor=${warning["nomor"]}',
+          );
           if (result == true) {
             _loadWarnings();
           }
@@ -914,7 +1161,10 @@ class _AkunTabKelurahanState extends State<AkunTabKelurahan> {
         title: const Text('Logout'),
         content: const Text('Apakah Anda yakin ingin logout?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -933,9 +1183,9 @@ class _AkunTabKelurahanState extends State<AkunTabKelurahan> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal logout: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Gagal logout: $e')));
       }
     }
   }
@@ -950,7 +1200,9 @@ class _AkunTabKelurahanState extends State<AkunTabKelurahan> {
           // Profile Card
           Card(
             elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -958,12 +1210,19 @@ class _AkunTabKelurahanState extends State<AkunTabKelurahan> {
                   CircleAvatar(
                     radius: 40,
                     backgroundColor: Colors.green.shade700,
-                    child: const Icon(Icons.person, size: 40, color: Colors.white),
+                    child: const Icon(
+                      Icons.person,
+                      size: 40,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     _userName ?? 'Loading...',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(

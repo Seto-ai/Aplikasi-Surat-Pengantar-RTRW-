@@ -47,7 +47,10 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
 
         if (existing.docs.isNotEmpty) {
           setState(() {
-            _currentHolder = {'id': existing.docs[0].id, ...existing.docs[0].data()};
+            _currentHolder = {
+              'id': existing.docs[0].id,
+              ...existing.docs[0].data(),
+            };
             _mode = 'replace';
           });
         } else {
@@ -113,10 +116,15 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
       final now = DateTime.now();
       final periodeAkhir = now.add(Duration(days: 365 * 5));
 
-      // Update user: set role to rt/rw
-      await _firestore.collection('users').doc(uid).update({
-        'role': widget.type,
-      });
+      // Update user: set role to rt/rw and update rt/rw field
+      final updateData = {'role': widget.type};
+      // Set rt or rw field based on type
+      if (widget.type == 'rt') {
+        updateData['rt'] = widget.nomor;
+      } else if (widget.type == 'rw') {
+        updateData['rw'] = widget.nomor;
+      }
+      await _firestore.collection('users').doc(uid).update(updateData);
 
       // Add to riwayatRTRW
       await _firestore.collection('riwayatRTRW').add({
@@ -146,7 +154,9 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
         context: context,
         builder: (context) => AlertDialog(
           title: Text('Konfirmasi Copot Jabatan'),
-          content: Text('Copot jabatan ${widget.type == 'rt' ? 'Ketua RT' : 'Ketua RW'} dari $nama?'),
+          content: Text(
+            'Copot jabatan ${widget.type == 'rt' ? 'Ketua RT' : 'Ketua RW'} dari $nama?',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -163,10 +173,15 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
 
       if (confirm != true) return;
 
-      // Revert role to 'warga'
-      await _firestore.collection('users').doc(uid).update({
-        'role': 'warga',
-      });
+      // Revert role to 'warga' and clear rt/rw field
+      final updateData = {'role': 'warga'};
+      // Clear rt or rw field based on type
+      if (widget.type == 'rt') {
+        updateData['rt'] = '';
+      } else if (widget.type == 'rw') {
+        updateData['rw'] = '';
+      }
+      await _firestore.collection('users').doc(uid).update(updateData);
 
       if (mounted) {
         UxHelper.showSuccess(context, 'Jabatan berhasil dicopotkan!');
@@ -183,19 +198,21 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_mode == 'select'
-            ? 'Cari Posisi'
-            : _mode == 'recruit'
-                ? 'Rekrut ${widget.type == 'rt' ? 'Ketua RT' : 'Ketua RW'} ${widget.nomor}'
-                : 'Ganti Jabatan'),
+        title: Text(
+          _mode == 'select'
+              ? 'Cari Posisi'
+              : _mode == 'recruit'
+              ? 'Rekrut ${widget.type == 'rt' ? 'Ketua RT' : 'Ketua RW'} ${widget.nomor}'
+              : 'Ganti Jabatan',
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _mode == 'select'
-              ? _buildSelectMode()
-              : _mode == 'recruit'
-                  ? _buildRecruitMode()
-                  : _buildReplaceMode(),
+          ? _buildSelectMode()
+          : _mode == 'recruit'
+          ? _buildRecruitMode()
+          : _buildReplaceMode(),
     );
   }
 
@@ -219,7 +236,10 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
 
   Widget _buildRTRWSelector() {
     return StreamBuilder<QuerySnapshot>(
-      stream: _firestore.collection('users').where('role', whereIn: ['rt', 'rw']).snapshots(),
+      stream: _firestore
+          .collection('users')
+          .where('role', whereIn: ['rt', 'rw'])
+          .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(child: Text('Error: ${snapshot.error}'));
@@ -229,7 +249,9 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final allRTRW = snapshot.data!.docs.map((doc) => {...(doc.data() as Map<String, dynamic>)}).toList();
+        final allRTRW = snapshot.data!.docs
+            .map((doc) => {...(doc.data() as Map<String, dynamic>)})
+            .toList();
 
         // Group by RW first, then by RT
         final rwMap = <String, List<Map<String, dynamic>>>{};
@@ -251,7 +273,9 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
             ...rwMap.entries.map((entry) {
               return _buildPositionCard(
                 title: 'RW ${entry.key}',
-                subtitle: entry.value.isNotEmpty ? 'Dipimpin: ${entry.value[0]['nama']}' : 'Kosong',
+                subtitle: entry.value.isNotEmpty
+                    ? 'Dipimpin: ${entry.value[0]['nama']}'
+                    : 'Kosong',
                 onTap: () async {
                   final result = await context.push(
                     '/rekrut-kelurahan?type=rw&nomor=${entry.key}',
@@ -327,8 +351,14 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
               backgroundColor: Colors.blue.shade700,
               child: const Icon(Icons.person, color: Colors.white),
             ),
-            title: Text(warga['nama'] ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text(warga['email'] ?? 'N/A', style: const TextStyle(fontSize: 12)),
+            title: Text(
+              warga['nama'] ?? 'N/A',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              warga['email'] ?? 'N/A',
+              style: const TextStyle(fontSize: 12),
+            ),
             trailing: const Icon(Icons.arrow_forward),
             onTap: () => _showWargaDetail(warga),
           ),
@@ -374,7 +404,10 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
                 },
                 child: Text(
                   'Rekrut sebagai ${widget.type == 'rt' ? 'Ketua RT' : 'Ketua RW'} ${widget.nomor}',
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -389,10 +422,19 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Text(label, style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           const SizedBox(width: 16),
           Expanded(
-            child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -418,17 +460,27 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
                   CircleAvatar(
                     radius: 40,
                     backgroundColor: Colors.green.shade700,
-                    child: const Icon(Icons.admin_panel_settings, color: Colors.white, size: 32),
+                    child: const Icon(
+                      Icons.admin_panel_settings,
+                      color: Colors.white,
+                      size: 32,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     '${widget.type == 'rt' ? 'Ketua RT' : 'Ketua RW'} ${widget.nomor}',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     _currentHolder!['nama'] ?? 'N/A',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -458,10 +510,14 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
                 backgroundColor: Colors.red,
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
-              onPressed: () => _copotJabatan(_currentHolder!['id'], _currentHolder!['nama']),
+              onPressed: () =>
+                  _copotJabatan(_currentHolder!['id'], _currentHolder!['nama']),
               child: const Text(
                 'Copot Jabatan',
-                style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -490,22 +546,29 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
         }
 
         final candidates = snapshot.data!.docs
-            .map((doc) => {'id': doc.id, ...(doc.data() as Map<String, dynamic>)})
+            .map(
+              (doc) => {'id': doc.id, ...(doc.data() as Map<String, dynamic>)},
+            )
             .toList();
 
         return Column(
           children: candidates
-              .map((warga) => Card(
-                    child: ListTile(
-                      title: Text(warga['nama'] ?? 'N/A'),
-                      subtitle: Text(warga['email'] ?? 'N/A', style: const TextStyle(fontSize: 11)),
-                      trailing: const Icon(Icons.arrow_forward),
-                      onTap: () {
-                        context.pop();
-                        _showWargaDetail(warga);
-                      },
+              .map(
+                (warga) => Card(
+                  child: ListTile(
+                    title: Text(warga['nama'] ?? 'N/A'),
+                    subtitle: Text(
+                      warga['email'] ?? 'N/A',
+                      style: const TextStyle(fontSize: 11),
                     ),
-                  ))
+                    trailing: const Icon(Icons.arrow_forward),
+                    onTap: () {
+                      context.pop();
+                      _showWargaDetail(warga);
+                    },
+                  ),
+                ),
+              )
               .toList(),
         );
       },
@@ -535,7 +598,10 @@ class _RekrutKelurahanScreenState extends State<RekrutKelurahanScreen> {
               _buildDetailRow('Email', person['email'] ?? '-'),
               _buildDetailRow('No. HP', person['noHp'] ?? '-'),
               _buildDetailRow('NIK', person['nik'] ?? '-'),
-              _buildDetailRow('RT/RW', 'RT ${person['rt']} / RW ${person['rw']}'),
+              _buildDetailRow(
+                'RT/RW',
+                'RT ${person['rt']} / RW ${person['rw']}',
+              ),
               _buildDetailRow('Jenis Kelamin', person['jenisKelamin'] ?? '-'),
               _buildDetailRow('Pekerjaan', person['pekerjaan'] ?? '-'),
               const SizedBox(height: 24),

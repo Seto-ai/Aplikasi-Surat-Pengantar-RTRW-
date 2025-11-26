@@ -100,8 +100,8 @@ class _RTRWDashboardScreenState extends State<RTRWDashboardScreen> {
           body: _selectedIndex == 0
               ? _buildBerandaTab()
               : _selectedIndex == 1
-                  ? _buildLihatWargaTab()
-                  : _buildAkunTab(),
+              ? _buildLihatWargaTab()
+              : _buildAkunTab(),
           bottomNavigationBar: BottomNavigationBar(
             items: [
               BottomNavigationBarItem(
@@ -220,7 +220,7 @@ class _BerandaTabRTState extends State<BerandaTabRT> {
       'draft': 'Draft',
       'diajukan': 'Menunggu Persetujuan RT',
       'acc_rt': 'Disetujui RT, Menunggu RW',
-      'acc_rw': 'Disetujui RW, Menunggu Kelurahan',
+      'acc_rw': 'Disetujui RW',
       'acc_kelurahan': 'Disetujui',
       'ditolak': 'Ditolak',
     };
@@ -259,7 +259,8 @@ class _BerandaTabRTState extends State<BerandaTabRT> {
                     hintText: 'Cari surat...',
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                   onChanged: (val) {
@@ -285,15 +286,17 @@ class _BerandaTabRTState extends State<BerandaTabRT> {
               ],
             ),
           ),
-          Expanded(
-            child: _buildSuratListStream(),
-          ),
+          Expanded(child: _buildSuratListStream()),
         ],
       ),
     );
   }
 
-  Widget _buildSortChip(String label, String value, Function(VoidCallback) setState) {
+  Widget _buildSortChip(
+    String label,
+    String value,
+    Function(VoidCallback) setState,
+  ) {
     final isSelected = _sortBy == value;
     return FilterChip(
       label: Text(label),
@@ -328,9 +331,7 @@ class _BerandaTabRTState extends State<BerandaTabRT> {
       stream: query.snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(
-            child: Text('Error: ${snapshot.error}'),
-          );
+          return Center(child: Text('Error: ${snapshot.error}'));
         }
 
         if (!snapshot.hasData) {
@@ -342,21 +343,33 @@ class _BerandaTabRTState extends State<BerandaTabRT> {
         // Sort
         if (_sortBy == 'oldest') {
           docs.sort((a, b) {
-            final aTime = (a['tanggalPengajuan'] as Timestamp?)?.toDate() ?? DateTime(1970);
-            final bTime = (b['tanggalPengajuan'] as Timestamp?)?.toDate() ?? DateTime(1970);
+            final aTime =
+                (a['tanggalPengajuan'] as Timestamp?)?.toDate() ??
+                DateTime(1970);
+            final bTime =
+                (b['tanggalPengajuan'] as Timestamp?)?.toDate() ??
+                DateTime(1970);
             return aTime.compareTo(bTime);
           });
         } else if (_sortBy == 'newest') {
           docs.sort((a, b) {
-            final aTime = (a['tanggalPengajuan'] as Timestamp?)?.toDate() ?? DateTime(1970);
-            final bTime = (b['tanggalPengajuan'] as Timestamp?)?.toDate() ?? DateTime(1970);
+            final aTime =
+                (a['tanggalPengajuan'] as Timestamp?)?.toDate() ??
+                DateTime(1970);
+            final bTime =
+                (b['tanggalPengajuan'] as Timestamp?)?.toDate() ??
+                DateTime(1970);
             return bTime.compareTo(aTime);
           });
         } else if (_sortBy == 'acc') {
-          docs = docs.where((d) => 
-              d['status'] == 'acc_rt' || 
-              d['status'] == 'acc_rw' || 
-              d['status'] == 'acc_kelurahan').toList();
+          docs = docs
+              .where(
+                (d) =>
+                    d['status'] == 'acc_rt' ||
+                    d['status'] == 'acc_rw' ||
+                    d['status'] == 'acc_kelurahan',
+              )
+              .toList();
         } else if (_sortBy == 'ditolak') {
           docs = docs.where((d) => d['status'] == 'ditolak').toList();
         }
@@ -364,10 +377,11 @@ class _BerandaTabRTState extends State<BerandaTabRT> {
         // Filter by search
         final filtered = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          final dataPemohon = data['dataPemohon'] as Map<String, dynamic>? ?? {};
+          final dataPemohon =
+              data['dataPemohon'] as Map<String, dynamic>? ?? {};
           final namaPemohon = (dataPemohon['nama'] as String?) ?? '';
           final keperluan = (data['keperluan'] as String?) ?? '';
-          
+
           if (_searchQuery.isEmpty) return true;
           return namaPemohon.toLowerCase().contains(_searchQuery) ||
               keperluan.toLowerCase().contains(_searchQuery);
@@ -486,8 +500,9 @@ class _LihatWargaTabRTState extends State<LihatWargaTabRT> {
           .where('role', isEqualTo: 'warga')
           .get();
 
-      _wargaByRT[widget.myRT!] =
-          snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+      _wargaByRT[widget.myRT!] = snapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList();
     } catch (e) {
       print('Error loading warga: $e');
     }
@@ -501,8 +516,9 @@ class _LihatWargaTabRTState extends State<LihatWargaTabRT> {
           .where('role', isEqualTo: 'rt')
           .get();
 
-      _rtList =
-          rtSnapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+      _rtList = rtSnapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList();
 
       // Load warga untuk setiap RT
       for (var rt in _rtList) {
@@ -574,16 +590,19 @@ class _LihatWargaTabRTState extends State<LihatWargaTabRT> {
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               subtitle: Text('RW ${widget.myRW}'),
-              trailing:
-                  Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
+              trailing: Icon(
+                isExpanded ? Icons.expand_less : Icons.expand_more,
+              ),
               onTap: () => _toggleRT(rtValue),
               tileColor: Colors.grey.shade100,
             ),
             if (isExpanded)
-              ...wargaList.map((warga) => Padding(
-                    padding: const EdgeInsets.only(left: 16),
-                    child: _buildWargaCard(warga),
-                  )),
+              ...wargaList.map(
+                (warga) => Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: _buildWargaCard(warga),
+                ),
+              ),
           ],
         );
       },
@@ -595,23 +614,32 @@ class _LihatWargaTabRTState extends State<LihatWargaTabRT> {
     final name = warga['nama'] ?? 'N/A';
     final rt = warga['rt']?.toString() ?? '';
     final isRT = warga['role'] == 'rt';
-    
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: Colors.green.shade700,
-          child: Icon(isRT ? Icons.admin_panel_settings : Icons.person, color: Colors.white),
+          child: Icon(
+            isRT ? Icons.admin_panel_settings : Icons.person,
+            color: Colors.white,
+          ),
         ),
         title: Text(
           isRT ? 'Ketua RT $rt - $name' : name,
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-        subtitle:
-            Text(warga['email'] ?? 'N/A', style: const TextStyle(fontSize: 12)),
-        trailing: const Icon(Icons.arrow_forward_ios,
-            size: 14, color: Colors.grey),
-        onTap: () => context.push('/detail-akun?readOnly=true'),
+        subtitle: Text(
+          warga['email'] ?? 'N/A',
+          style: const TextStyle(fontSize: 12),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          size: 14,
+          color: Colors.grey,
+        ),
+        onTap: () =>
+            context.push('/detail-akun?readOnly=true&userId=${warga['id']}'),
       ),
     );
   }
@@ -667,9 +695,10 @@ class _AkunTabRTState extends State<AkunTabRT> {
                             .take(2)
                             .join(),
                         style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 20),
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -677,14 +706,21 @@ class _AkunTabRTState extends State<AkunTabRT> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(widget.userName,
-                              style: const TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.w700)),
+                          Text(
+                            widget.userName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                           const SizedBox(height: 6),
                           Text(
-                              'RT ${widget.userRT} / RW ${widget.userRW}',
-                              style: TextStyle(
-                                  color: Colors.grey[700], fontSize: 12)),
+                            'RT ${widget.userRT} / RW ${widget.userRW}',
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -702,7 +738,7 @@ class _AkunTabRTState extends State<AkunTabRT> {
                       leading: Icon(Icons.person, color: Color(0xFF27AE60)),
                       title: Text(locProvider.t('view_profile')),
                       trailing: Icon(Icons.chevron_right),
-                      onTap: () => context.push('/detail-akun?readOnly=true'),
+                      onTap: () => context.push('/detail-akun'),
                     ),
                     Divider(height: 1),
                     ListTile(
@@ -713,8 +749,10 @@ class _AkunTabRTState extends State<AkunTabRT> {
                     ),
                     Divider(height: 1),
                     ListTile(
-                      leading:
-                          Icon(Icons.lock_outline, color: Color(0xFF27AE60)),
+                      leading: Icon(
+                        Icons.lock_outline,
+                        color: Color(0xFF27AE60),
+                      ),
                       title: Text(locProvider.t('change_password')),
                       trailing: Icon(Icons.chevron_right),
                       onTap: () => context.push('/ganti-kata-sandi'),
@@ -722,8 +760,10 @@ class _AkunTabRTState extends State<AkunTabRT> {
                     Divider(height: 1),
                     ListTile(
                       leading: Icon(Icons.logout, color: Colors.red),
-                      title: Text(locProvider.t('logout'),
-                          style: const TextStyle(color: Colors.red)),
+                      title: Text(
+                        locProvider.t('logout'),
+                        style: const TextStyle(color: Colors.red),
+                      ),
                       onTap: () async {
                         final confirm = await showDialog<bool>(
                           context: context,
@@ -732,13 +772,11 @@ class _AkunTabRTState extends State<AkunTabRT> {
                             content: Text(locProvider.t('logout_question')),
                             actions: [
                               TextButton(
-                                onPressed: () =>
-                                    Navigator.pop(context, false),
+                                onPressed: () => Navigator.pop(context, false),
                                 child: Text(locProvider.t('cancel')),
                               ),
                               ElevatedButton(
-                                onPressed: () =>
-                                    Navigator.pop(context, true),
+                                onPressed: () => Navigator.pop(context, true),
                                 child: Text(locProvider.t('exit')),
                               ),
                             ],

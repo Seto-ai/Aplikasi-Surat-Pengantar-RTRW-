@@ -13,11 +13,7 @@ class BuatSuratScreen extends StatefulWidget {
   final String? suratId; // ID surat untuk mode edit
   final String mode; // 'create' atau 'edit'
 
-  const BuatSuratScreen({
-    super.key,
-    this.suratId,
-    this.mode = 'create',
-  });
+  const BuatSuratScreen({super.key, this.suratId, this.mode = 'create'});
 
   @override
   _BuatSuratScreenState createState() => _BuatSuratScreenState();

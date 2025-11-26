@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -694,17 +693,15 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                     SizedBox(height: 12),
                   ],
 
-                  // Tampilkan approval controls untuk RT/RW/Kelurahan
+                  // Tampilkan approval controls untuk RT/RW saja (bukan kelurahan)
                   if (_myRole != null &&
                       (_myRole == 'rt' ||
                           _myRole == 'rw' ||
-                          _myRole == 'rt_rw' ||
-                          _myRole == 'kelurahan'))
+                          _myRole == 'rt_rw'))
                     if ((_myRole == 'rt' && status == 'diajukan') ||
                         (_myRole == 'rw' && status == 'acc_rt') ||
                         (_myRole == 'rt_rw' &&
-                            (status == 'diajukan' || status == 'acc_rt')) ||
-                        (_myRole == 'kelurahan' && status == 'acc_rw')) ...[
+                            (status == 'diajukan' || status == 'acc_rt'))) ...[
                       SizedBox(height: 8),
                       Row(
                         children: [
@@ -768,6 +765,10 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                                   );
                                 } catch (e) {
                                   if (mounted) {
+                                    print('[DEBUG] Reject error - $e');
+                                    print(
+                                      '[DEBUG] User role: $_myRole, Surat ID: ${widget.id}',
+                                    );
                                     UxHelper.showError(
                                       context,
                                       'Gagal menolak surat: $e',
@@ -815,6 +816,9 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                                       : _myRole == 'kelurahan'
                                       ? 'acc_kelurahan'
                                       : 'acc_rt';
+                                  print(
+                                    '[DEBUG] Approval - Role: $_myRole, Current Status: $status, New Status: $newStatus',
+                                  );
                                   await _firestore
                                       .collection('surat')
                                       .doc(widget.id)
@@ -841,6 +845,10 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                                   );
                                 } catch (e) {
                                   if (mounted) {
+                                    print('[DEBUG] Approval error - $e');
+                                    print(
+                                      '[DEBUG] User role: $_myRole, Surat ID: ${widget.id}',
+                                    );
                                     UxHelper.showError(
                                       context,
                                       'Gagal menerima surat: $e',

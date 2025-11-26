@@ -7,8 +7,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DetailAkunScreen extends StatefulWidget {
   final bool isReadOnly;
+  final String?
+  userId; // ID user yang ingin dilihat (jika null, gunakan current user)
 
-  const DetailAkunScreen({super.key, this.isReadOnly = false});
+  const DetailAkunScreen({super.key, this.isReadOnly = false, this.userId});
 
   @override
   State<DetailAkunScreen> createState() => _DetailAkunScreenState();
@@ -25,7 +27,8 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
   }
 
   Future<void> _loadUser() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    // Jika userId diberikan, load data user tersebut. Jika tidak, load current user
+    final uid = widget.userId ?? FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
       setState(() {
         _loading = false;
@@ -54,6 +57,13 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
     String label,
     String? initial,
   ) async {
+    // Jangan allow edit jika isReadOnly atau sedang lihat user lain
+    if (widget.isReadOnly || widget.userId != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Anda tidak bisa mengedit data orang lain')),
+      );
+      return;
+    }
     final controller = TextEditingController(text: initial ?? '');
     final formKey = GlobalKey<FormState>();
     final ok = await showDialog<bool>(
@@ -245,7 +255,7 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
                   ),
                   SizedBox(height: 8),
                   Text(_maskPhone(_user?['noHp'])),
-                  if (!widget.isReadOnly)
+                  if (!widget.isReadOnly && widget.userId == null)
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
@@ -270,7 +280,7 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
                   Text('Email', style: TextStyle(fontWeight: FontWeight.w600)),
                   SizedBox(height: 8),
                   Text(_user?['email'] ?? '-'),
-                  if (!widget.isReadOnly)
+                  if (!widget.isReadOnly && widget.userId == null)
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
@@ -295,7 +305,7 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
                   Text('NIK', style: TextStyle(fontWeight: FontWeight.w600)),
                   SizedBox(height: 8),
                   Text(_user?['nik'] ?? '-'),
-                  if (!widget.isReadOnly)
+                  if (!widget.isReadOnly && widget.userId == null)
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
@@ -360,7 +370,8 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
               ),
             ),
             SizedBox(height: 12),
-            if (!widget.isReadOnly)
+            // Hanya tampilkan button ubah jika lihat profil sendiri (tidak readonly dan userId null)
+            if (!widget.isReadOnly && widget.userId == null)
               ElevatedButton(
                 onPressed: () => context.push('/biodata?mode=edit'),
                 child: Text('Ubah'),
