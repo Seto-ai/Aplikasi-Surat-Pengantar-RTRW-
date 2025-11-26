@@ -1,0 +1,986 @@
+import 'package:aplikasi_surat_mobile/utils/ux_helper.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../utils/localization.dart';
+import 'package:provider/provider.dart';
+
+class KelurahanDashboardScreen extends StatefulWidget {
+  @override
+  State<KelurahanDashboardScreen> createState() => _KelurahanDashboardScreenState();
+}
+
+class _KelurahanDashboardScreenState extends State<KelurahanDashboardScreen> {
+  int _selectedIndex = 0;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  String? _currentUserName;
+  String? _kelurahan;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final uid = _auth.currentUser!.uid;
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists) {
+        setState(() {
+          _currentUserName = doc['nama'] ?? 'User';
+          _kelurahan = doc['kelurahan'];
+        });
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+    }
+  }
+
+  String _getGreeting(LocalizationProvider loc) {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Selamat Pagi';
+    if (hour < 15) return 'Selamat Siang';
+    if (hour < 18) return 'Selamat Sore';
+    return 'Selamat Malam';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<LocalizationProvider>(
+      builder: (context, locProvider, _) {
+        return Scaffold(
+          appBar: AppBar(
+            elevation: 0,
+            backgroundColor: Colors.white,
+            automaticallyImplyLeading: false,
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getGreeting(locProvider),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _currentUserName ?? 'User',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+                _buildLanguageDropdown(locProvider),
+              ],
+            ),
+          ),
+          body: _selectedIndex == 0
+              ? _buildBerandaTab()
+              : _selectedIndex == 1
+                  ? _buildLihatWargaTab()
+                  : _selectedIndex == 2
+                      ? _buildManajemenRTRWTab()
+                      : _selectedIndex == 3
+                          ? _buildRekrutTab()
+                          : _buildAkunTab(),
+          bottomNavigationBar: BottomNavigationBar(
+            backgroundColor: Colors.white,
+            selectedItemColor: Colors.green.shade700,
+            unselectedItemColor: Colors.grey.shade600,
+            items: [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home),
+                label: locProvider.t('home'),
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.people),
+                label: 'Lihat Warga',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.admin_panel_settings),
+                label: 'Manajemen',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_add),
+                label: 'Rekrut',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.account_circle),
+                label: 'Akun',
+              ),
+            ],
+            currentIndex: _selectedIndex,
+            onTap: (index) => setState(() => _selectedIndex = index),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLanguageDropdown(LocalizationProvider locProvider) {
+    return PopupMenuButton<String>(
+      offset: const Offset(0, 48),
+      itemBuilder: (BuildContext context) {
+        return [
+          const PopupMenuItem<String>(
+            value: 'id',
+            child: Text('🇮🇩 Indonesian'),
+          ),
+          const PopupMenuItem<String>(
+            value: 'en',
+            child: Text('🇬🇧 English'),
+          ),
+        ];
+      },
+      onSelected: (String locale) {
+        locProvider.setLocale(locale);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.green.shade700),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.language, color: Colors.green.shade700, size: 20),
+            const SizedBox(width: 6),
+            Text(
+              locProvider.currentLocale.toUpperCase(),
+              style: TextStyle(
+                color: Colors.green.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Icon(Icons.arrow_drop_down, color: Colors.green.shade700),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBerandaTab() {
+    return BerandaTabKelurahan();
+  }
+
+  Widget _buildLihatWargaTab() {
+    return LihatWargaTabKelurahan();
+  }
+
+  Widget _buildManajemenRTRWTab() {
+    return ManajemenRTRWTab();
+  }
+
+  Widget _buildRekrutTab() {
+    return RekrutTabKelurahan();
+  }
+
+  Widget _buildAkunTab() {
+    return AkunTabKelurahan();
+  }
+}
+
+// ============ BERANDA TAB ============
+class BerandaTabKelurahan extends StatefulWidget {
+  @override
+  State<BerandaTabKelurahan> createState() => _BerandaTabKelurahanState();
+}
+
+class _BerandaTabKelurahanState extends State<BerandaTabKelurahan> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String _searchQuery = '';
+  String _sortBy = 'newest';
+
+  String _getStatusLabel(String status) {
+    final labelMap = {
+      'draft': 'Draft',
+      'diajukan': 'Menunggu Persetujuan RT',
+      'acc_rt': 'Disetujui RT, Menunggu RW',
+      'acc_rw': 'Disetujui RW, Menunggu Kelurahan',
+      'acc_kelurahan': 'Disetujui',
+      'ditolak': 'Ditolak',
+    };
+    return labelMap[status] ?? status;
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'draft':
+        return Colors.orange;
+      case 'diajukan':
+      case 'acc_rt':
+      case 'acc_rw':
+        return Colors.blue;
+      case 'acc_kelurahan':
+        return Colors.green;
+      case 'ditolak':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StatefulBuilder(
+      builder: (context, setState) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Cari surat...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onChanged: (val) {
+                    setState(() => _searchQuery = val.toLowerCase());
+                  },
+                ),
+                const SizedBox(height: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildSortChip('Terbaru', 'newest', setState),
+                      const SizedBox(width: 8),
+                      _buildSortChip('Terlama', 'oldest', setState),
+                      const SizedBox(width: 8),
+                      _buildSortChip('Disetujui', 'approved', setState),
+                      const SizedBox(width: 8),
+                      _buildSortChip('Ditolak', 'rejected', setState),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(child: _buildSuratListStream()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSortChip(String label, String value, Function(VoidCallback) setState) {
+    final isSelected = _sortBy == value;
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) {
+        setState(() => _sortBy = value);
+      },
+      backgroundColor: Colors.white,
+      selectedColor: Colors.green.shade100,
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.green.shade700 : Colors.black,
+        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+      ),
+    );
+  }
+
+  Widget _buildSuratListStream() {
+    // Kelurahan hanya lihat surat yang sudah acc_rw (tahap final)
+    Query query = _firestore.collection('surat').where('status', isEqualTo: 'acc_rw');
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: query.snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        var docs = snapshot.data!.docs;
+
+        // Sort
+        if (_sortBy == 'oldest') {
+          docs.sort((a, b) {
+            final aTime = (a['tanggalPengajuan'] as Timestamp?)?.toDate() ?? DateTime(1970);
+            final bTime = (b['tanggalPengajuan'] as Timestamp?)?.toDate() ?? DateTime(1970);
+            return aTime.compareTo(bTime);
+          });
+        } else if (_sortBy == 'newest') {
+          docs.sort((a, b) {
+            final aTime = (a['tanggalPengajuan'] as Timestamp?)?.toDate() ?? DateTime(1970);
+            final bTime = (b['tanggalPengajuan'] as Timestamp?)?.toDate() ?? DateTime(1970);
+            return bTime.compareTo(aTime);
+          });
+        }
+
+        final filtered = docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final namaPemohon = (data['namaPemohon'] as String?) ?? '';
+          final keperluan = (data['keperluan'] as String?) ?? '';
+          
+          if (_searchQuery.isEmpty) return true;
+          return namaPemohon.toLowerCase().contains(_searchQuery) ||
+              keperluan.toLowerCase().contains(_searchQuery);
+        }).toList();
+
+        if (filtered.isEmpty) {
+          return const Center(child: Text('Tidak ada surat masuk'));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          itemCount: filtered.length,
+          itemBuilder: (context, index) {
+            final doc = filtered[index];
+            final data = doc.data() as Map<String, dynamic>;
+            return _buildSuratCard(doc.id, data);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSuratCard(String docId, Map<String, dynamic> data) {
+    final namaPemohon = data['namaPemohon'] ?? 'Tanpa Nama';
+    final keperluan = data['keperluan'] ?? '-';
+    final statusLabel = _getStatusLabel(data['status'] ?? 'draft');
+    final statusColor = _getStatusColor(data['status'] ?? 'draft');
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+      child: ListTile(
+        title: Text(
+          namaPemohon,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(keperluan, maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
+            Text(
+              statusLabel,
+              style: TextStyle(
+                color: statusColor,
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => context.push('/detail-surat/$docId'),
+      ),
+    );
+  }
+}
+
+// ============ LIHAT WARGA TAB ============
+class LihatWargaTabKelurahan extends StatefulWidget {
+  @override
+  State<LihatWargaTabKelurahan> createState() => _LihatWargaTabKelurahanState();
+}
+
+class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _rwList = [];
+  final Map<String, List<Map<String, dynamic>>> _rtByRW = {};
+  final Map<String, List<Map<String, dynamic>>> _wargaByRT = {};
+  final Set<String> _expandedRWs = {};
+  final Set<String> _expandedRTs = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      setState(() => _isLoading = true);
+      
+      // Load all RW
+      final rwSnapshot = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: 'rw')
+          .get();
+      
+      _rwList = rwSnapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+
+      // Load RT for each RW
+      for (var rw in _rwList) {
+        final rwNum = rw['rw'];
+        if (rwNum == null) continue;
+        
+        final rtSnapshot = await _firestore
+            .collection('users')
+            .where('rw', isEqualTo: rwNum)
+            .where('role', isEqualTo: 'rt')
+            .get();
+        _rtByRW[rwNum] = rtSnapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+
+        // Load warga for each RT
+        for (var rt in _rtByRW[rwNum]!) {
+          final rtNum = rt['rt'];
+          if (rtNum == null) continue;
+          
+          try {
+            final wargaSnapshot = await _firestore
+                .collection('users')
+                .where('rt', isEqualTo: rtNum)
+                .where('role', isEqualTo: 'warga')
+                .get();
+            _wargaByRT[rtNum] = wargaSnapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+          } catch (e) {
+            print('Error loading warga for RT $rtNum: $e');
+          }
+        }
+      }
+
+      if (mounted) setState(() => _isLoading = false);
+    } catch (e) {
+      print('Error: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        UxHelper.showError(context, 'Gagal memuat data: $e');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return ListView.builder(
+      itemCount: _rwList.length,
+      itemBuilder: (context, rwIndex) {
+        final rw = _rwList[rwIndex];
+        final rwValue = rw['rw'];
+        final isRWExpanded = _expandedRWs.contains(rwValue);
+        final rtList = _rtByRW[rwValue] ?? [];
+
+        return Column(
+          children: [
+            ListTile(
+              title: Text(
+                'Ketua RW $rwValue - ${rw['nama'] ?? "N/A"}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              trailing: Icon(isRWExpanded ? Icons.expand_less : Icons.expand_more),
+              onTap: () {
+                setState(() {
+                  if (_expandedRWs.contains(rwValue)) {
+                    _expandedRWs.remove(rwValue);
+                  } else {
+                    _expandedRWs.add(rwValue);
+                  }
+                });
+              },
+              tileColor: Colors.blue.shade50,
+            ),
+            if (isRWExpanded)
+              ...rtList.map((rt) {
+                final rtValue = rt['rt'];
+                final isRTExpanded = _expandedRTs.contains(rtValue);
+                final wargaList = _wargaByRT[rtValue] ?? [];
+
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16),
+                      child: ListTile(
+                        title: Text(
+                          'Ketua RT $rtValue - ${rt['nama'] ?? "N/A"}',
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        trailing: Icon(isRTExpanded ? Icons.expand_less : Icons.expand_more),
+                        onTap: () {
+                          setState(() {
+                            if (_expandedRTs.contains(rtValue)) {
+                              _expandedRTs.remove(rtValue);
+                            } else {
+                              _expandedRTs.add(rtValue);
+                            }
+                          });
+                        },
+                        tileColor: Colors.grey.shade100,
+                      ),
+                    ),
+                    if (isRTExpanded)
+                      ...wargaList.map((warga) => Padding(
+                            padding: const EdgeInsets.only(left: 32),
+                            child: _buildWargaCard(warga),
+                          )),
+                  ],
+                );
+              }),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildWargaCard(Map<String, dynamic> warga) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.green.shade700,
+          child: const Icon(Icons.person, color: Colors.white),
+        ),
+        title: Text(warga['nama'] ?? 'N/A'),
+        subtitle: Text(warga['email'] ?? 'N/A', style: const TextStyle(fontSize: 12)),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+        onTap: () => context.push('/detail-akun?readOnly=true'),
+      ),
+    );
+  }
+}
+
+// ============ MANAJEMEN RT/RW TAB ============
+class ManajemenRTRWTab extends StatefulWidget {
+  @override
+  State<ManajemenRTRWTab> createState() => _ManajemenRTRWTabState();
+}
+
+class _ManajemenRTRWTabState extends State<ManajemenRTRWTab> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _rtRWActive = [];
+  List<Map<String, dynamic>> _rtRWHistory = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      setState(() => _isLoading = true);
+
+      // Load active RT/RW (from users collection)
+      final snapshot = await _firestore
+          .collection('users')
+          .where('role', whereIn: ['rt', 'rw', 'rt_rw'])
+          .get();
+      
+      _rtRWActive = snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+
+      // Load history (from riwayatRTRW collection)
+      final historySnapshot = await _firestore
+          .collection('riwayatRTRW')
+          .get();
+      
+      _rtRWHistory = historySnapshot.docs.map((doc) => {...doc.data()}).toList();
+
+      if (mounted) setState(() => _isLoading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        UxHelper.showError(context, 'Error: $e');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          TabBar(
+            labelColor: Colors.black87,
+            unselectedLabelColor: Colors.grey.shade600,
+            indicatorColor: Colors.green.shade700,
+            tabs: const [
+              Tab(text: 'Yang Menjabat'),
+              Tab(text: 'Riwayat'),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildActiveList(),
+                _buildHistoryList(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveList() {
+    if (_rtRWActive.isEmpty) {
+      return const Center(child: Text('Tidak ada RT/RW yang menjabat'));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: _rtRWActive.length,
+      itemBuilder: (context, index) {
+        final person = _rtRWActive[index];
+        final role = person['role'];
+        String title = '';
+        if (role == 'rt') {
+          title = 'Ketua RT ${person['rt']}';
+        } else if (role == 'rw') {
+          title = 'Ketua RW ${person['rw']}';
+        } else if (role == 'rt_rw') {
+          title = 'Ketua RT ${person['rt']} & RW ${person['rw']}';
+        }
+
+        return Card(
+          child: ListTile(
+            title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(person['nama'] ?? 'N/A'),
+            trailing: const Icon(Icons.info_outline),
+            onTap: () => context.push('/detail-akun?readOnly=true'),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHistoryList() {
+    if (_rtRWHistory.isEmpty) {
+      return const Center(child: Text('Tidak ada riwayat'));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: _rtRWHistory.length,
+      itemBuilder: (context, index) {
+        final history = _rtRWHistory[index];
+        final periodeStr = '${history['periode_mulai']} s/d ${history['periode_akhir']}';
+
+        return Card(
+          child: ListTile(
+            title: Text(history['nama'] ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text('RW ${history['nomor_rw']}\n$periodeStr'),
+            isThreeLine: true,
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ============ REKRUT TAB ============
+class RekrutTabKelurahan extends StatefulWidget {
+  @override
+  State<RekrutTabKelurahan> createState() => _RekrutTabKelurahanState();
+}
+
+class _RekrutTabKelurahanState extends State<RekrutTabKelurahan> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _warnings = [];
+  String _filterType = 'all'; // 'all', 'rt', 'rw'
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWarnings();
+  }
+
+  Future<void> _loadWarnings() async {
+    try {
+      setState(() => _isLoading = true);
+      _warnings = [];
+
+      // Get all RW
+      final rwSnapshot = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: 'rw')
+          .get();
+      
+      for (var rwDoc in rwSnapshot.docs) {
+        final rwData = rwDoc.data();
+        final rwValue = rwData['rw'];
+        if (rwValue == null) continue;
+        
+        // Check if there's any RT with this RW
+        final rtCount = await _firestore
+            .collection('users')
+            .where('rw', isEqualTo: rwValue)
+            .where('role', isEqualTo: 'rt')
+            .count()
+            .get();
+        
+        if (rtCount.count == 0) {
+          _warnings.add({
+            'type': 'rw',
+            'nomor': rwValue,
+            'nama': rwData['nama'],
+            'message': 'RW $rwValue belum ada yang menjabat'
+          });
+        }
+      }
+
+      // Get all RT positions that don't have anyone
+      final allRTs = await _firestore.collection('users').get();
+      final allRTNumbers = <String>{};
+      
+      for (var doc in allRTs.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        if (data.containsKey('rt')) {
+          final rtValue = data['rt'];
+          if (rtValue != null) {
+            allRTNumbers.add(rtValue.toString());
+          }
+        }
+      }
+
+      // Check which RTs are empty
+      for (String rt in allRTNumbers) {
+        final rtExists = await _firestore
+            .collection('users')
+            .where('rt', isEqualTo: rt)
+            .where('role', isEqualTo: 'rt')
+            .count()
+            .get();
+        
+        if (rtExists.count == 0) {
+          _warnings.add({
+            'type': 'rt',
+            'nomor': rt,
+            'message': 'RT $rt belum ada yang menjabat'
+          });
+        }
+      }
+
+      if (mounted) setState(() => _isLoading = false);
+    } catch (e) {
+      print('Error: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        UxHelper.showError(context, 'Error: $e');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final filteredWarnings = _warnings.where((w) {
+      if (_filterType == 'all') return true;
+      return w['type'] == _filterType;
+    }).toList();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Expanded(
+                child: DropdownButton<String>(
+                  value: _filterType,
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('Semua')),
+                    DropdownMenuItem(value: 'rw', child: Text('RW')),
+                    DropdownMenuItem(value: 'rt', child: Text('RT')),
+                  ],
+                  onChanged: (val) {
+                    setState(() => _filterType = val ?? 'all');
+                  },
+                  isExpanded: true,
+                ),
+              ),
+              SizedBox(width: 8),
+              ElevatedButton.icon(
+                icon: Icon(Icons.refresh),
+                label: Text('Refresh'),
+                onPressed: _loadWarnings,
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: filteredWarnings.isEmpty
+              ? const Center(child: Text('Semua posisi sudah terisi'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: filteredWarnings.length,
+                  itemBuilder: (context, index) {
+                    final warning = filteredWarnings[index];
+                    return _buildWarningCard(warning);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWarningCard(Map<String, dynamic> warning) {
+    return Card(
+      child: ListTile(
+        leading: Icon(
+          warning['type'] == 'rw' ? Icons.warning : Icons.info,
+          color: Colors.orange,
+        ),
+        title: Text(warning['message'], style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(warning['type'].toUpperCase()),
+        trailing: const Icon(Icons.arrow_forward),
+        onTap: () async {
+          // Navigate to warga selection screen
+          final result = await context.push('/rekrut-kelurahan?type=${warning["type"]}&nomor=${warning["nomor"]}');
+          if (result == true) {
+            _loadWarnings();
+          }
+        },
+      ),
+    );
+  }
+}
+
+// ============ AKUN TAB ============
+class AkunTabKelurahan extends StatefulWidget {
+  @override
+  State<AkunTabKelurahan> createState() => _AkunTabKelurahanState();
+}
+
+class _AkunTabKelurahanState extends State<AkunTabKelurahan> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String? _userName;
+  String? _userEmail;
+  String? _userKelurahan;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final uid = _auth.currentUser!.uid;
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists) {
+        setState(() {
+          _userName = doc['nama'] ?? 'User';
+          _userEmail = doc['email'] ?? 'N/A';
+          _userKelurahan = doc['kelurahan'] ?? 'N/A';
+        });
+      }
+    } catch (e) {
+      print('Error loading user: $e');
+    }
+  }
+
+  Future<void> _logout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Apakah Anda yakin ingin logout?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _auth.signOut();
+      if (mounted) {
+        context.go('/');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal logout: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Profile Card
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor: Colors.green.shade700,
+                    child: const Icon(Icons.person, size: 40, color: Colors.white),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _userName ?? 'Loading...',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Kelurahan: ${_userKelurahan ?? 'N/A'}',
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _userEmail ?? 'N/A',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Logout Button
+          ElevatedButton.icon(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+            label: const Text('Logout'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

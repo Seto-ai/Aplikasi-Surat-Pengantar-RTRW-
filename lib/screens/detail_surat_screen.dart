@@ -8,7 +8,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../utils/ux_helper.dart';
 
 class DetailSuratScreen extends StatefulWidget {
@@ -32,7 +31,7 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
     if (uid == null) return;
     final doc = await _firestore.collection('users').doc(uid).get();
     setState(() {
-      _myRole = doc.data()?['role']?.toString();
+      _myRole = doc.data()?['role']?.toString().toLowerCase().trim();
     });
   }
 
@@ -474,11 +473,23 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                       style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
                       icon: Icon(Icons.visibility),
                       label: Text('Lihat Foto Surat TTD', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      onPressed: () async {
-                        final url = data['urlSuratTtd'];
-                        if (await canLaunchUrl(Uri.parse(url))) {
-                          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-                        }
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text('Foto Surat TTD'),
+                            content: SizedBox(
+                              width: double.maxFinite,
+                              child: Image.network(data['urlSuratTtd']),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: Text('Tutup'),
+                              ),
+                            ],
+                          ),
+                        );
                       },
                     ),
                   ],

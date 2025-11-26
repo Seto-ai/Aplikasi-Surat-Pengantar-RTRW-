@@ -10,8 +10,11 @@ import 'screens/auth_screen.dart';
 import 'screens/biodata_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/warga_dashboard_screen.dart';
+import 'screens/rt_rw_dashboard_screen.dart';
+import 'screens/kelurahan_dashboard_screen.dart';
 import 'screens/buat_surat_screen.dart';
 import 'screens/rekrut_rtrw_screen.dart';
+import 'screens/rekrut_kelurahan_screen.dart';
 import 'screens/tambah_anggota_screen.dart';
 import 'screens/detail_surat_screen.dart';
 import 'screens/detail_akun_screen.dart';
@@ -38,12 +41,36 @@ class MyApp extends StatelessWidget {
       GoRoute(path: '/biodata', builder: (context, state) => BiodataScreen(isEditMode: state.uri.queryParameters['mode'] == 'edit')),
       // Warga dashboard
       GoRoute(path: '/dashboard/warga', builder: (context, state) => WargaDashboardScreen()),
-      // RT/RW/Kelurahan dashboards (still using old one for now)
-      GoRoute(path: '/dashboard/:role', builder: (context, state) => DashboardScreen(role: state.pathParameters['role']!)),
+      // RT/RW dashboards (new version)
+      GoRoute(
+        path: '/dashboard/:role',
+        builder: (context, state) {
+          var role = state.pathParameters['role']!.toLowerCase().trim();
+          print('DEBUG: Dashboard route matched. Role value: "$role" (length: ${role.length})');
+          
+          // Use new RTRWDashboardScreen for RT, RW, and RT_RW roles
+          final isRTRW = role == 'rt' || role == 'rw' || role == 'rt_rw';
+          print('DEBUG: isRTRW=$isRTRW, showing: ${isRTRW ? "RTRWDashboardScreen" : role == "kelurahan" ? "KelurahanDashboardScreen" : "DashboardScreen"}');
+          
+          if (isRTRW) {
+            return RTRWDashboardScreen(role: role);
+          } else if (role == 'kelurahan') {
+            return KelurahanDashboardScreen();
+          }
+          return DashboardScreen(role: role); // fallback
+        },
+      ),
       GoRoute(path: '/buat-surat', builder: (context, state) => BuatSuratScreen()),
       GoRoute(path: '/rekrut-rtrw', builder: (context, state) => RekrutRTRWScreen()),
+      GoRoute(
+        path: '/rekrut-kelurahan',
+        builder: (context, state) => RekrutKelurahanScreen(
+          type: state.uri.queryParameters['type'],
+          nomor: state.uri.queryParameters['nomor'],
+        ),
+      ),
       GoRoute(path: '/tambah-anggota', builder: (context, state) => TambahAnggotaScreen()),
-      GoRoute(path: '/detail-akun', builder: (context, state) => DetailAkunScreen()),
+      GoRoute(path: '/detail-akun', builder: (context, state) => DetailAkunScreen(isReadOnly: state.uri.queryParameters['readOnly'] == 'true')),
       GoRoute(path: '/ganti-kata-sandi', builder: (context, state) => GantiPasswordScreen()),
       GoRoute(path: '/riwayat-surat', builder: (context, state) => RiwayatSuratScreen()),
       GoRoute(path: '/daftar-keluarga', builder: (context, state) => DaftarKeluargaScreen()),

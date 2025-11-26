@@ -313,13 +313,14 @@ class _BerandaTabRTState extends State<BerandaTabRT> {
   Widget _buildSuratListStream() {
     Query query = _firestore.collection('surat');
 
+    // Sesuaikan query berdasarkan peran untuk menggunakan field di dalam dataPemohon
     if (widget.role == 'rt') {
       query = query
-          .where('rt', isEqualTo: widget.myRT)
+          .where('dataPemohon.rt', isEqualTo: widget.myRT)
           .where('status', isEqualTo: 'diajukan');
     } else if (widget.role == 'rw') {
       query = query
-          .where('rw', isEqualTo: widget.myRW)
+          .where('dataPemohon.rw', isEqualTo: widget.myRW)
           .where('status', isEqualTo: 'acc_rt');
     }
 
@@ -363,7 +364,8 @@ class _BerandaTabRTState extends State<BerandaTabRT> {
         // Filter by search
         final filtered = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          final namaPemohon = (data['namaPemohon'] as String?) ?? '';
+          final dataPemohon = data['dataPemohon'] as Map<String, dynamic>? ?? {};
+          final namaPemohon = (dataPemohon['nama'] as String?) ?? '';
           final keperluan = (data['keperluan'] as String?) ?? '';
           
           if (_searchQuery.isEmpty) return true;
@@ -389,7 +391,8 @@ class _BerandaTabRTState extends State<BerandaTabRT> {
   }
 
   Widget _buildSuratCard(String docId, Map<String, dynamic> data) {
-    final namaPemohon = data['namaPemohon'] ?? 'Tanpa Nama';
+    final dataPemohon = data['dataPemohon'] as Map<String, dynamic>? ?? {};
+    final namaPemohon = dataPemohon['nama'] ?? 'Tanpa Nama';
     final keperluan = data['keperluan'] ?? '-';
     final status = data['status'] ?? 'draft';
     final statusLabel = _getStatusLabel(status);
@@ -567,10 +570,10 @@ class _LihatWargaTabRTState extends State<LihatWargaTabRT> {
           children: [
             ListTile(
               title: Text(
-                rt['nama'] ?? 'RT $rtValue',
+                'Ketua RT $rtValue - ${rt['nama'] ?? "N/A"}',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              subtitle: Text('RT $rtValue RW ${widget.myRW}'),
+              subtitle: Text('RW ${widget.myRW}'),
               trailing:
                   Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
               onTap: () => _toggleRT(rtValue),

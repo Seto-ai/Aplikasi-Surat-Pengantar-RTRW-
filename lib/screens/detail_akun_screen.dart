@@ -6,6 +6,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DetailAkunScreen extends StatefulWidget {
+  final bool isReadOnly;
+
+  const DetailAkunScreen({this.isReadOnly = false});
+
   @override
   State<DetailAkunScreen> createState() => _DetailAkunScreenState();
 }
@@ -202,10 +206,11 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
                   Text('Telepon', style: TextStyle(fontWeight: FontWeight.w600)),
                   SizedBox(height: 8),
                   Text(_maskPhone(_user?['noHp'])),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(onPressed: () => _updateField('noHp', 'Telepon', _user?['noHp']), child: Text('Ubah')),
-                  ),
+                  if (!widget.isReadOnly)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(onPressed: () => _updateField('noHp', 'Telepon', _user?['noHp']), child: Text('Ubah')),
+                    ),
                 ],
               ),
             ),
@@ -222,10 +227,11 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
                   Text('Email', style: TextStyle(fontWeight: FontWeight.w600)),
                   SizedBox(height: 8),
                   Text(_user?['email'] ?? '-'),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(onPressed: () => _updateField('email', 'Email', _user?['email']), child: Text('Ubah')),
-                  ),
+                  if (!widget.isReadOnly)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(onPressed: () => _updateField('email', 'Email', _user?['email']), child: Text('Ubah')),
+                    ),
                 ],
               ),
             ),
@@ -242,10 +248,11 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
                   Text('NIK', style: TextStyle(fontWeight: FontWeight.w600)),
                   SizedBox(height: 8),
                   Text(_user?['nik'] ?? '-'),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(onPressed: () => _updateField('nik', 'NIK', _user?['nik']), child: Text('Ubah')),
-                  ),
+                  if (!widget.isReadOnly)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(onPressed: () => _updateField('nik', 'NIK', _user?['nik']), child: Text('Ubah')),
+                    ),
                 ],
               ),
             ),
@@ -288,7 +295,8 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
                   ),
                 )),
             SizedBox(height: 12),
-            ElevatedButton(onPressed: () => context.push('/biodata?mode=edit'), child: Text('Ubah')),
+            if (!widget.isReadOnly)
+              ElevatedButton(onPressed: () => context.push('/biodata?mode=edit'), child: Text('Ubah')),
           ],
         ),
       ),
@@ -310,11 +318,12 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
                   SizedBox(height: 12),
                   _buildDetailCard(),
                   SizedBox(height: 20),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                    onPressed: _deleteAccount,
-                    child: Text('Hapus Akun'),
-                  ),
+                  if (!widget.isReadOnly)
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                      onPressed: _deleteAccount,
+                      child: Text('Hapus Akun'),
+                    ),
                 ],
               ),
             ),
