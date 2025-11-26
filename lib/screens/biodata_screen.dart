@@ -10,8 +10,8 @@ import '../utils/validation_helper.dart';
 
 class BiodataScreen extends StatefulWidget {
   final bool isEditMode;
-  
-  BiodataScreen({this.isEditMode = false});
+
+  const BiodataScreen({super.key, this.isEditMode = false});
 
   @override
   _BiodataScreenState createState() => _BiodataScreenState();
@@ -21,24 +21,65 @@ class _BiodataScreenState extends State<BiodataScreen> {
   final _firestore = FirebaseFirestore.instance;
   final _supabase = Supabase.instance.client;
   final _formKey = GlobalKey<FormState>();
-  
+
   bool _isLoading = false;
-  
+
   // Controllers untuk editing
-  late TextEditingController _namaCtrl, _nikCtrl, _alamatCtrl, _kecamatanCtrl, _kotaCtrl, _provinsiCtrl, _tempatLahirCtrl, _pekerjaanCtrl, _noHpCtrl;
-  
+  late TextEditingController _namaCtrl,
+      _nikCtrl,
+      _alamatCtrl,
+      _kecamatanCtrl,
+      _kotaCtrl,
+      _provinsiCtrl,
+      _tempatLahirCtrl,
+      _pekerjaanCtrl,
+      _noHpCtrl;
+
   // Autocomplete suggestions
-  final List<String> _pekerjaanList = ['PNS', 'Wiraswasta', 'Pelajar', 'Mahasiswa', 'Pensiunan', 'Lainnya'];
-  final List<String> _statusDiKeluargaList = ['Kepala Keluarga', 'Istri', 'Suami', 'Anak', 'Menantu', 'Cucu', 'Orang Tua', 'Mertua', 'Family Lain', 'Lainnya'];
-  final List<String> _statusPerkawinanList = ['Belum Kawin', 'Kawin', 'Cerai Hidup', 'Cerai Mati'];
-  final List<String> _agamaList = ['Islam', 'Kristen Protestan', 'Kristen Katolik', 'Hindu', 'Buddha', 'Konghucu'];
+  final List<String> _pekerjaanList = [
+    'PNS',
+    'Wiraswasta',
+    'Pelajar',
+    'Mahasiswa',
+    'Pensiunan',
+    'Lainnya',
+  ];
+  final List<String> _statusDiKeluargaList = [
+    'Kepala Keluarga',
+    'Istri',
+    'Suami',
+    'Anak',
+    'Menantu',
+    'Cucu',
+    'Orang Tua',
+    'Mertua',
+    'Family Lain',
+    'Lainnya',
+  ];
+  final List<String> _statusPerkawinanList = [
+    'Belum Kawin',
+    'Kawin',
+    'Cerai Hidup',
+    'Cerai Mati',
+  ];
+  final List<String> _agamaList = [
+    'Islam',
+    'Kristen Protestan',
+    'Kristen Katolik',
+    'Hindu',
+    'Buddha',
+    'Konghucu',
+  ];
 
   // Form values
-  String? _selectedAgama, _selectedJenisKelamin, _selectedStatusDiKeluarga, _selectedStatusPerkawinan;
+  String? _selectedAgama,
+      _selectedJenisKelamin,
+      _selectedStatusDiKeluarga,
+      _selectedStatusPerkawinan;
   String? _selectedRt, _selectedRw;
   DateTime? _selectedTanggalLahir;
   String? _urlFotoKk, _urlFotoKtp;
-  
+
   // Master data for dropdowns
   List<String> _rwList = [];
   List<String> _rtList = [];
@@ -55,34 +96,36 @@ class _BiodataScreenState extends State<BiodataScreen> {
     _tempatLahirCtrl = TextEditingController();
     _pekerjaanCtrl = TextEditingController();
     _noHpCtrl = TextEditingController();
-    
+
     // Load RT/RW master data
     _loadRtRwData();
-    
+
     // Load existing data if in edit mode
     if (widget.isEditMode) {
       _loadExistingBiodata();
     }
   }
-  
+
   Future<void> _loadRtRwData() async {
     try {
       // Load RW list
       final rwSnapshot = await _firestore.collection('rw').get();
-      final rwList = rwSnapshot.docs
-          .map((doc) => doc['nomor_rw']?.toString() ?? '')
-          .where((rw) => rw.isNotEmpty)
-          .toList()
-        ..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
-      
+      final rwList =
+          rwSnapshot.docs
+              .map((doc) => doc['nomor_rw']?.toString() ?? '')
+              .where((rw) => rw.isNotEmpty)
+              .toList()
+            ..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+
       // Load RT list
       final rtSnapshot = await _firestore.collection('rt').get();
-      final rtList = rtSnapshot.docs
-          .map((doc) => doc['nomor_rt']?.toString() ?? '')
-          .where((rt) => rt.isNotEmpty)
-          .toList()
-        ..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
-      
+      final rtList =
+          rtSnapshot.docs
+              .map((doc) => doc['nomor_rt']?.toString() ?? '')
+              .where((rt) => rt.isNotEmpty)
+              .toList()
+            ..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+
       setState(() {
         _rwList = rwList;
         _rtList = rtList;
@@ -96,10 +139,10 @@ class _BiodataScreenState extends State<BiodataScreen> {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
-      
+
       final doc = await _firestore.collection('users').doc(uid).get();
       if (!doc.exists) return;
-      
+
       final data = doc.data() as Map<String, dynamic>;
       setState(() {
         _namaCtrl.text = data['nama'] ?? '';
@@ -113,22 +156,27 @@ class _BiodataScreenState extends State<BiodataScreen> {
         _tempatLahirCtrl.text = data['tempatLahir'] ?? '';
         _pekerjaanCtrl.text = data['pekerjaan'] ?? '';
         _noHpCtrl.text = data['noHp'] ?? '';
-        
+
         _selectedAgama = data['agama'];
         _selectedJenisKelamin = data['jenisKelamin'];
         _selectedStatusDiKeluarga = data['statusDiKeluarga'];
         _selectedStatusPerkawinan = data['statusPerkawinan'];
-        
+
         if (data['tanggalLahir'] != null) {
-          _selectedTanggalLahir = DateTime.parse(data['tanggalLahir'] as String);
+          _selectedTanggalLahir = DateTime.parse(
+            data['tanggalLahir'] as String,
+          );
         }
-        
+
         _urlFotoKk = data['urlFotoKk'];
         _urlFotoKtp = data['urlFotoKtp'];
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memuat data: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Gagal memuat data: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -167,28 +215,44 @@ class _BiodataScreenState extends State<BiodataScreen> {
         builder: (context) => AlertDialog(
           title: Text('Pilih Sumber Foto'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, ImageSource.camera), child: Text('Kamera')),
-            TextButton(onPressed: () => Navigator.pop(context, ImageSource.gallery), child: Text('Galeri')),
+            TextButton(
+              onPressed: () => Navigator.pop(context, ImageSource.camera),
+              child: Text('Kamera'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, ImageSource.gallery),
+              child: Text('Galeri'),
+            ),
           ],
         ),
       );
-      
+
       if (source == null) return;
-      
-      final pickedFile = await picker.pickImage(source: source, imageQuality: 80);
+
+      final pickedFile = await picker.pickImage(
+        source: source,
+        imageQuality: 80,
+      );
       if (pickedFile == null) return;
 
       // Upload to Supabase with unique filename
-      final fileName = '${FirebaseAuth.instance.currentUser!.uid}_${type}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final fileName =
+          '${FirebaseAuth.instance.currentUser!.uid}_${type}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final bytes = await pickedFile.readAsBytes();
-      
+
       await _supabase.storage
           .from('dokumen-warga')
-          .uploadBinary(fileName, bytes, fileOptions: FileOptions(upsert: true));
-      
+          .uploadBinary(
+            fileName,
+            bytes,
+            fileOptions: FileOptions(upsert: true),
+          );
+
       // Get public URL
-      final url = _supabase.storage.from('dokumen-warga').getPublicUrl(fileName);
-      
+      final url = _supabase.storage
+          .from('dokumen-warga')
+          .getPublicUrl(fileName);
+
       setState(() {
         if (type == 'kk') {
           _urlFotoKk = url;
@@ -196,28 +260,40 @@ class _BiodataScreenState extends State<BiodataScreen> {
           _urlFotoKtp = url;
         }
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✓ Foto $type berhasil diupload'), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text('✓ Foto $type berhasil diupload'),
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Gagal upload foto: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('❌ Gagal upload foto: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
 
   Future<void> _saveBiodata() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     // Validasi foto wajib hanya jika create (bukan edit)
     if (!widget.isEditMode && (_urlFotoKk == null || _urlFotoKtp == null)) {
       UxHelper.showWarning(context, 'Foto KK dan KTP harus diupload');
       return;
     }
-    
+
     // Validasi dropdown
-    if (_selectedAgama == null || _selectedJenisKelamin == null || _selectedStatusDiKeluarga == null || _selectedStatusPerkawinan == null || _selectedTanggalLahir == null || _selectedRt == null || _selectedRw == null) {
+    if (_selectedAgama == null ||
+        _selectedJenisKelamin == null ||
+        _selectedStatusDiKeluarga == null ||
+        _selectedStatusPerkawinan == null ||
+        _selectedTanggalLahir == null ||
+        _selectedRt == null ||
+        _selectedRw == null) {
       UxHelper.showError(context, 'Semua field harus diisi');
       return;
     }
@@ -246,7 +322,7 @@ class _BiodataScreenState extends State<BiodataScreen> {
         'kewarganegaraan': 'NKRI',
         'noHp': _noHpCtrl.text.trim(),
       };
-      
+
       // Add photos only if not null (for edit mode)
       if (_urlFotoKk != null) userData['urlFotoKk'] = _urlFotoKk;
       if (_urlFotoKtp != null) userData['urlFotoKtp'] = _urlFotoKtp;
@@ -260,10 +336,10 @@ class _BiodataScreenState extends State<BiodataScreen> {
         userData['role'] = 'warga';
         userData['createdAt'] = DateTime.now().toString();
         userData['email'] = FirebaseAuth.instance.currentUser!.email!;
-        
+
         await _firestore.collection('users').doc(uid).set(userData);
       }
-      
+
       if (mounted) {
         UxHelper.showSuccess(context, 'Biodata berhasil disimpan');
         if (widget.isEditMode) {
@@ -272,7 +348,8 @@ class _BiodataScreenState extends State<BiodataScreen> {
           });
         } else {
           Future.delayed(Duration(milliseconds: 800), () {
-            if (mounted) context.go('/dashboard/warga'); // Go to dashboard after create
+            if (mounted)
+              context.go('/dashboard/warga'); // Go to dashboard after create
           });
         }
       }
@@ -291,7 +368,16 @@ class _BiodataScreenState extends State<BiodataScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Isi Biodata Lengkap'),
-        leading: IconButton(icon: Icon(Icons.arrow_back), onPressed: () => context.go('/')),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () {
+            if (widget.isEditMode) {
+              context.pop(); // Go back to previous page
+            } else {
+              context.go('/'); // Go to home if not edit mode
+            }
+          },
+        ),
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
@@ -303,17 +389,32 @@ class _BiodataScreenState extends State<BiodataScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // === IDENTITAS PRIBADI ===
-                    Text('1. Identitas Pribadi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
+                    Text(
+                      '1. Identitas Pribadi',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green.shade700,
+                      ),
+                    ),
                     SizedBox(height: 16),
                     TextFormField(
                       controller: _namaCtrl,
-                      decoration: InputDecoration(labelText: 'Nama Lengkap *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person)),
+                      decoration: InputDecoration(
+                        labelText: 'Nama Lengkap *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person),
+                      ),
                       validator: ValidationHelper.validateNama,
                     ),
                     SizedBox(height: 12),
                     TextFormField(
                       controller: _nikCtrl,
-                      decoration: InputDecoration(labelText: 'NIK (16 digit) *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.badge)),
+                      decoration: InputDecoration(
+                        labelText: 'NIK (16 digit) *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.badge),
+                      ),
                       keyboardType: TextInputType.number,
                       validator: ValidationHelper.validateNIK,
                       maxLength: 16,
@@ -321,37 +422,72 @@ class _BiodataScreenState extends State<BiodataScreen> {
                     SizedBox(height: 12),
                     TextFormField(
                       controller: _tempatLahirCtrl,
-                      decoration: InputDecoration(labelText: 'Tempat Lahir *', border: OutlineInputBorder()),
-                      validator: (val) => val!.isEmpty ? 'Tempat lahir tidak boleh kosong' : val.length < 3 ? 'Minimal 3 karakter' : null,
+                      decoration: InputDecoration(
+                        labelText: 'Tempat Lahir *',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (val) => val!.isEmpty
+                          ? 'Tempat lahir tidak boleh kosong'
+                          : val.length < 3
+                          ? 'Minimal 3 karakter'
+                          : null,
                     ),
                     SizedBox(height: 12),
                     GestureDetector(
                       onTap: _pickDate,
                       child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                        decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              _selectedTanggalLahir != null ? DateFormat('dd MMMM yyyy').format(_selectedTanggalLahir!) : 'Pilih Tanggal Lahir *',
+                              _selectedTanggalLahir != null
+                                  ? DateFormat(
+                                      'dd MMMM yyyy',
+                                    ).format(_selectedTanggalLahir!)
+                                  : 'Pilih Tanggal Lahir *',
                               style: TextStyle(fontSize: 16),
                             ),
-                            Icon(Icons.calendar_today, color: Colors.green.shade700),
+                            Icon(
+                              Icons.calendar_today,
+                              color: Colors.green.shade700,
+                            ),
                           ],
                         ),
                       ),
                     ),
                     SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      decoration: InputDecoration(labelText: 'Agama *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.church)),
-                      value: _selectedAgama,
-                      items: _agamaList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                      decoration: InputDecoration(
+                        labelText: 'Agama *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.church),
+                      ),
+                      initialValue: _selectedAgama,
+                      items: _agamaList
+                          .map(
+                            (e) => DropdownMenuItem(value: e, child: Text(e)),
+                          )
+                          .toList(),
                       onChanged: (val) => setState(() => _selectedAgama = val),
-                      validator: (val) => val == null ? 'Agama wajib dipilih' : null,
+                      validator: (val) =>
+                          val == null ? 'Agama wajib dipilih' : null,
                     ),
                     SizedBox(height: 12),
-                    Text('Jenis Kelamin *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    Text(
+                      'Jenis Kelamin *',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     SizedBox(height: 8),
                     Row(
                       children: [
@@ -360,7 +496,8 @@ class _BiodataScreenState extends State<BiodataScreen> {
                             title: Text('Laki-laki'),
                             value: 'Laki-laki',
                             groupValue: _selectedJenisKelamin,
-                            onChanged: (val) => setState(() => _selectedJenisKelamin = val),
+                            onChanged: (val) =>
+                                setState(() => _selectedJenisKelamin = val),
                           ),
                         ),
                         Expanded(
@@ -368,7 +505,8 @@ class _BiodataScreenState extends State<BiodataScreen> {
                             title: Text('Perempuan'),
                             value: 'Perempuan',
                             groupValue: _selectedJenisKelamin,
-                            onChanged: (val) => setState(() => _selectedJenisKelamin = val),
+                            onChanged: (val) =>
+                                setState(() => _selectedJenisKelamin = val),
                           ),
                         ),
                       ],
@@ -378,82 +516,164 @@ class _BiodataScreenState extends State<BiodataScreen> {
                     SizedBox(height: 16),
 
                     // === ALAMAT & DOMISILI ===
-                    Text('2. Alamat & Domisili', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
+                    Text(
+                      '2. Alamat & Domisili',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green.shade700,
+                      ),
+                    ),
                     SizedBox(height: 16),
                     TextFormField(
                       controller: _alamatCtrl,
-                      decoration: InputDecoration(labelText: 'Alamat Lengkap *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.home)),
+                      decoration: InputDecoration(
+                        labelText: 'Alamat Lengkap *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.home),
+                      ),
                       maxLines: 2,
-                      validator: (val) => val!.isEmpty ? 'Alamat wajib diisi' : null,
+                      validator: (val) =>
+                          val!.isEmpty ? 'Alamat wajib diisi' : null,
                     ),
                     SizedBox(height: 12),
-                    Row(children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          decoration: InputDecoration(labelText: 'RT *', border: OutlineInputBorder()),
-                          value: _selectedRt,
-                          items: _rtList.isEmpty
-                              ? [DropdownMenuItem(value: null, child: Text('Memuat data...'))]
-                              : _rtList.map((rt) => DropdownMenuItem(value: rt, child: Text('RT $rt'))).toList(),
-                          onChanged: (val) => setState(() => _selectedRt = val),
-                          validator: (val) => val == null ? 'RT wajib dipilih' : null,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            decoration: InputDecoration(
+                              labelText: 'RT *',
+                              border: OutlineInputBorder(),
+                            ),
+                            initialValue: _selectedRt,
+                            items: _rtList.isEmpty
+                                ? [
+                                    DropdownMenuItem(
+                                      value: null,
+                                      child: Text('Memuat data...'),
+                                    ),
+                                  ]
+                                : _rtList
+                                      .map(
+                                        (rt) => DropdownMenuItem(
+                                          value: rt,
+                                          child: Text('RT $rt'),
+                                        ),
+                                      )
+                                      .toList(),
+                            onChanged: (val) =>
+                                setState(() => _selectedRt = val),
+                            validator: (val) =>
+                                val == null ? 'RT wajib dipilih' : null,
+                          ),
                         ),
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          decoration: InputDecoration(labelText: 'RW *', border: OutlineInputBorder()),
-                          value: _selectedRw,
-                          items: _rwList.isEmpty
-                              ? [DropdownMenuItem(value: null, child: Text('Memuat data...'))]
-                              : _rwList.map((rw) => DropdownMenuItem(value: rw, child: Text('RW $rw'))).toList(),
-                          onChanged: (val) => setState(() => _selectedRw = val),
-                          validator: (val) => val == null ? 'RW wajib dipilih' : null,
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            decoration: InputDecoration(
+                              labelText: 'RW *',
+                              border: OutlineInputBorder(),
+                            ),
+                            initialValue: _selectedRw,
+                            items: _rwList.isEmpty
+                                ? [
+                                    DropdownMenuItem(
+                                      value: null,
+                                      child: Text('Memuat data...'),
+                                    ),
+                                  ]
+                                : _rwList
+                                      .map(
+                                        (rw) => DropdownMenuItem(
+                                          value: rw,
+                                          child: Text('RW $rw'),
+                                        ),
+                                      )
+                                      .toList(),
+                            onChanged: (val) =>
+                                setState(() => _selectedRw = val),
+                            validator: (val) =>
+                                val == null ? 'RW wajib dipilih' : null,
+                          ),
                         ),
-                      ),
-                    ]),
+                      ],
+                    ),
                     SizedBox(height: 12),
                     TextFormField(
                       controller: _kecamatanCtrl,
-                      decoration: InputDecoration(labelText: 'Kecamatan *', border: OutlineInputBorder()),
-                      validator: (val) => val!.isEmpty ? 'Kecamatan wajib diisi' : null,
+                      decoration: InputDecoration(
+                        labelText: 'Kecamatan *',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (val) =>
+                          val!.isEmpty ? 'Kecamatan wajib diisi' : null,
                     ),
                     SizedBox(height: 12),
-                    Row(children: [
-                      Expanded(child: TextFormField(
-                        controller: _kotaCtrl,
-                        decoration: InputDecoration(labelText: 'Kota/Kabupaten *', border: OutlineInputBorder()),
-                        validator: (val) => val!.isEmpty ? 'Kota wajib' : null,
-                      )),
-                      SizedBox(width: 12),
-                      Expanded(child: TextFormField(
-                        controller: _provinsiCtrl,
-                        decoration: InputDecoration(labelText: 'Provinsi *', border: OutlineInputBorder()),
-                        validator: (val) => val!.isEmpty ? 'Provinsi wajib' : null,
-                      )),
-                    ]),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _kotaCtrl,
+                            decoration: InputDecoration(
+                              labelText: 'Kota/Kabupaten *',
+                              border: OutlineInputBorder(),
+                            ),
+                            validator: (val) =>
+                                val!.isEmpty ? 'Kota wajib' : null,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _provinsiCtrl,
+                            decoration: InputDecoration(
+                              labelText: 'Provinsi *',
+                              border: OutlineInputBorder(),
+                            ),
+                            validator: (val) =>
+                                val!.isEmpty ? 'Provinsi wajib' : null,
+                          ),
+                        ),
+                      ],
+                    ),
                     SizedBox(height: 24),
                     Divider(),
                     SizedBox(height: 16),
 
                     // === PEKERJAAN & STATUS ===
-                    Text('3. Pekerjaan & Status Keluarga', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
+                    Text(
+                      '3. Pekerjaan & Status Keluarga',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green.shade700,
+                      ),
+                    ),
                     SizedBox(height: 16),
                     Autocomplete<String>(
                       optionsBuilder: (TextEditingValue value) {
                         if (value.text.isEmpty) return [];
-                        return _pekerjaanList.where((e) => e.toLowerCase().contains(value.text.toLowerCase()));
+                        return _pekerjaanList.where(
+                          (e) => e.toLowerCase().contains(
+                            value.text.toLowerCase(),
+                          ),
+                        );
                       },
                       onSelected: (String selection) {
                         _pekerjaanCtrl.text = selection;
                       },
                       fieldViewBuilder: (context, ttec, tfn, onFieldSubmitted) {
-                        _pekerjaanCtrl = ttec;
                         return TextFormField(
                           controller: ttec,
                           focusNode: tfn,
-                          decoration: InputDecoration(labelText: 'Pekerjaan *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.work)),
-                          validator: (val) => val!.isEmpty ? 'Pekerjaan wajib diisi' : null,
+                          decoration: InputDecoration(
+                            labelText: 'Pekerjaan *',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.work),
+                          ),
+                          validator: (val) =>
+                              val!.isEmpty ? 'Pekerjaan wajib diisi' : null,
+                          onChanged: (val) => _pekerjaanCtrl.text = val,
                         );
                       },
                     ),
@@ -461,7 +681,11 @@ class _BiodataScreenState extends State<BiodataScreen> {
                     Autocomplete<String>(
                       optionsBuilder: (TextEditingValue value) {
                         if (value.text.isEmpty) return [];
-                        return _statusDiKeluargaList.where((e) => e.toLowerCase().contains(value.text.toLowerCase()));
+                        return _statusDiKeluargaList.where(
+                          (e) => e.toLowerCase().contains(
+                            value.text.toLowerCase(),
+                          ),
+                        );
                       },
                       onSelected: (String selection) {
                         setState(() => _selectedStatusDiKeluarga = selection);
@@ -471,24 +695,45 @@ class _BiodataScreenState extends State<BiodataScreen> {
                         return TextFormField(
                           controller: ttec,
                           focusNode: tfn,
-                          decoration: InputDecoration(labelText: 'Status di Keluarga *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.family_restroom)),
+                          decoration: InputDecoration(
+                            labelText: 'Status di Keluarga *',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.family_restroom),
+                          ),
                           onChanged: (val) => _selectedStatusDiKeluarga = val,
-                          validator: (val) => val!.isEmpty ? 'Status di keluarga wajib diisi' : null,
+                          validator: (val) => val!.isEmpty
+                              ? 'Status di keluarga wajib diisi'
+                              : null,
                         );
                       },
                     ),
                     SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      decoration: InputDecoration(labelText: 'Status Perkawinan *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.favorite)),
-                      value: _selectedStatusPerkawinan,
-                      items: _statusPerkawinanList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                      onChanged: (val) => setState(() => _selectedStatusPerkawinan = val),
-                      validator: (val) => val == null ? 'Status perkawinan wajib dipilih' : null,
+                      decoration: InputDecoration(
+                        labelText: 'Status Perkawinan *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.favorite),
+                      ),
+                      initialValue: _selectedStatusPerkawinan,
+                      items: _statusPerkawinanList
+                          .map(
+                            (e) => DropdownMenuItem(value: e, child: Text(e)),
+                          )
+                          .toList(),
+                      onChanged: (val) =>
+                          setState(() => _selectedStatusPerkawinan = val),
+                      validator: (val) => val == null
+                          ? 'Status perkawinan wajib dipilih'
+                          : null,
                     ),
                     SizedBox(height: 12),
                     TextFormField(
                       controller: _noHpCtrl,
-                      decoration: InputDecoration(labelText: 'No. HP (WhatsApp) *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone)),
+                      decoration: InputDecoration(
+                        labelText: 'No. HP (WhatsApp) *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.phone),
+                      ),
                       keyboardType: TextInputType.phone,
                       validator: ValidationHelper.validateNoHp,
                     ),
@@ -497,53 +742,107 @@ class _BiodataScreenState extends State<BiodataScreen> {
                     SizedBox(height: 16),
 
                     // === DOKUMEN ===
-                    Text('4. Dokumen Pendukung', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
+                    Text(
+                      '4. Dokumen Pendukung',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green.shade700,
+                      ),
+                    ),
                     SizedBox(height: 16),
-                    Row(children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => _uploadFoto('kk'),
-                          icon: Icon(Icons.image),
-                          label: Text('Upload Foto KK'),
-                          style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 12)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _uploadFoto('kk'),
+                            icon: Icon(Icons.image),
+                            label: Text('Upload Foto KK'),
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _uploadFoto('ktp'),
+                            icon: Icon(Icons.image),
+                            label: Text('Upload Foto KTP'),
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_urlFotoKk != null)
+                      Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade100,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.check_circle, color: Colors.green),
+                              SizedBox(width: 8),
+                              Text(
+                                'Foto KK berhasil diupload',
+                                style: TextStyle(color: Colors.green.shade700),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => _uploadFoto('ktp'),
-                          icon: Icon(Icons.image),
-                          label: Text('Upload Foto KTP'),
-                          style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 12)),
+                    if (_urlFotoKtp != null)
+                      Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade100,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.check_circle, color: Colors.green),
+                              SizedBox(width: 8),
+                              Text(
+                                'Foto KTP berhasil diupload',
+                                style: TextStyle(color: Colors.green.shade700),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ]),
-                    if (_urlFotoKk != null) Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(4)),
-                        child: Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 8), Text('Foto KK berhasil diupload', style: TextStyle(color: Colors.green.shade700))]),
-                      ),
-                    ),
-                    if (_urlFotoKtp != null) Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(4)),
-                        child: Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 8), Text('Foto KTP berhasil diupload', style: TextStyle(color: Colors.green.shade700))]),
-                      ),
-                    ),
                     SizedBox(height: 32),
 
                     // === TOMBOL SIMPAN ===
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 16)),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                      ),
                       onPressed: _saveBiodata,
-                      child: Text('Simpan Biodata & Lanjut', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      child: Text(
+                        'Simpan Biodata & Lanjut',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                     SizedBox(height: 8),
-                    Text('* Semua field harus diisi lengkap', style: TextStyle(fontSize: 12, color: Colors.orange, fontStyle: FontStyle.italic)),
+                    Text(
+                      '* Semua field harus diisi lengkap',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   ],
                 ),
               ),

@@ -7,6 +7,8 @@ import '../utils/localization.dart';
 import 'package:provider/provider.dart';
 
 class KelurahanDashboardScreen extends StatefulWidget {
+  const KelurahanDashboardScreen({super.key});
+
   @override
   State<KelurahanDashboardScreen> createState() => _KelurahanDashboardScreenState();
 }
@@ -195,6 +197,8 @@ class _KelurahanDashboardScreenState extends State<KelurahanDashboardScreen> {
 
 // ============ BERANDA TAB ============
 class BerandaTabKelurahan extends StatefulWidget {
+  const BerandaTabKelurahan({super.key});
+
   @override
   State<BerandaTabKelurahan> createState() => _BerandaTabKelurahanState();
 }
@@ -391,6 +395,8 @@ class _BerandaTabKelurahanState extends State<BerandaTabKelurahan> {
 
 // ============ LIHAT WARGA TAB ============
 class LihatWargaTabKelurahan extends StatefulWidget {
+  const LihatWargaTabKelurahan({super.key});
+
   @override
   State<LihatWargaTabKelurahan> createState() => _LihatWargaTabKelurahanState();
 }
@@ -556,6 +562,8 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
 
 // ============ MANAJEMEN RT/RW TAB ============
 class ManajemenRTRWTab extends StatefulWidget {
+  const ManajemenRTRWTab({super.key});
+
   @override
   State<ManajemenRTRWTab> createState() => _ManajemenRTRWTabState();
 }
@@ -690,6 +698,8 @@ class _ManajemenRTRWTabState extends State<ManajemenRTRWTab> {
 
 // ============ REKRUT TAB ============
 class RekrutTabKelurahan extends StatefulWidget {
+  const RekrutTabKelurahan({super.key});
+
   @override
   State<RekrutTabKelurahan> createState() => _RekrutTabKelurahanState();
 }
@@ -745,7 +755,7 @@ class _RekrutTabKelurahanState extends State<RekrutTabKelurahan> {
       final allRTNumbers = <String>{};
       
       for (var doc in allRTs.docs) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         if (data.containsKey('rt')) {
           final rtValue = data['rt'];
           if (rtValue != null) {
@@ -862,6 +872,8 @@ class _RekrutTabKelurahanState extends State<RekrutTabKelurahan> {
 
 // ============ AKUN TAB ============
 class AkunTabKelurahan extends StatefulWidget {
+  const AkunTabKelurahan({super.key});
+
   @override
   State<AkunTabKelurahan> createState() => _AkunTabKelurahanState();
 }

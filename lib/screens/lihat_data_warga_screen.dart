@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../utils/shimmer_loader.dart';
 
 class LihatDataWargaScreen extends StatefulWidget {
+  const LihatDataWargaScreen({super.key});
+
   @override
   _LihatDataWargaScreenState createState() => _LihatDataWargaScreenState();
 }
@@ -209,7 +211,7 @@ class _LihatDataWargaScreenState extends State<LihatDataWargaScreen> with Ticker
                     ),
                   ),
                 ),
-              )).toList(),
+              )),
               SizedBox(height: 20),
 
               // RT per RW
@@ -236,7 +238,7 @@ class _LihatDataWargaScreenState extends State<LihatDataWargaScreen> with Ticker
                     ),
                   ),
                 );
-              }).toList(),
+              }),
             ],
           ),
         );
@@ -279,7 +281,7 @@ class _LihatDataWargaScreenState extends State<LihatDataWargaScreen> with Ticker
           
           final wargaDocs = snapshot.data!.docs;
           if (wargaDocs.isEmpty) {
-            return Center(child: Text('Tidak ada warga di RT ${_userRt}'));
+            return Center(child: Text('Tidak ada warga di RT $_userRt'));
           }
           
           return ListView(
@@ -292,9 +294,9 @@ class _LihatDataWargaScreenState extends State<LihatDataWargaScreen> with Ticker
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('RW ${_userRw}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                      Text('RW $_userRw', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                       SizedBox(height: 4),
-                      Text('RT ${_userRt}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.blue.shade700)),
+                      Text('RT $_userRt', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.blue.shade700)),
                       SizedBox(height: 8),
                       Text('Total Warga: ${wargaDocs.length}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
                     ],
@@ -313,7 +315,7 @@ class _LihatDataWargaScreenState extends State<LihatDataWargaScreen> with Ticker
                     leading: CircleAvatar(child: Text(nama.substring(0, 1).toUpperCase())),
                   ),
                 );
-              }).toList(),
+              }),
             ],
           );
         },
@@ -328,7 +330,7 @@ class _LihatDataWargaScreenState extends State<LihatDataWargaScreen> with Ticker
           
           final rtDocs = snapshot.data!.docs;
           if (rtDocs.isEmpty) {
-            return Center(child: Text('Tidak ada RT di RW ${_userRw}'));
+            return Center(child: Text('Tidak ada RT di RW $_userRw'));
           }
           
           return ListView.builder(

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 class GantiPasswordScreen extends StatefulWidget {
+  const GantiPasswordScreen({super.key});
+
   @override
   _GantiPasswordScreenState createState() => _GantiPasswordScreenState();
 }

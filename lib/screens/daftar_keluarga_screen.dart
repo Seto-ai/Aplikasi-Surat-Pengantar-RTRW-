@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 class DaftarKeluargaScreen extends StatefulWidget {
+  const DaftarKeluargaScreen({super.key});
+
   @override
   _DaftarKeluargaScreenState createState() => _DaftarKeluargaScreenState();
 }
@@ -154,7 +156,7 @@ class _DaftarKeluargaScreenState extends State<DaftarKeluargaScreen> {
                         ],
                       ),
                     ),
-                  )).toList(),
+                  )),
                 ] else ...[
                   SizedBox(height: 32),
                   Center(

@@ -8,7 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class DetailAkunScreen extends StatefulWidget {
   final bool isReadOnly;
 
-  const DetailAkunScreen({this.isReadOnly = false});
+  const DetailAkunScreen({super.key, this.isReadOnly = false});
 
   @override
   State<DetailAkunScreen> createState() => _DetailAkunScreenState();
@@ -32,7 +32,10 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
       });
       return;
     }
-    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
     setState(() {
       _user = doc.data();
       _loading = false;
@@ -46,7 +49,11 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
     return '${'*' * (p.length - 3)}$visible';
   }
 
-  Future<void> _updateField(String fieldKey, String label, String? initial) async {
+  Future<void> _updateField(
+    String fieldKey,
+    String label,
+    String? initial,
+  ) async {
     final controller = TextEditingController(text: initial ?? '');
     final formKey = GlobalKey<FormState>();
     final ok = await showDialog<bool>(
@@ -58,14 +65,19 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
           child: TextFormField(
             controller: controller,
             decoration: InputDecoration(labelText: label),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Tidak boleh kosong' : null,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Tidak boleh kosong' : null,
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Batal'),
+          ),
           ElevatedButton(
             onPressed: () async {
-              if (formKey.currentState?.validate() ?? false) Navigator.pop(context, true);
+              if (formKey.currentState?.validate() ?? false)
+                Navigator.pop(context, true);
             },
             child: Text('Simpan'),
           ),
@@ -75,11 +87,17 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
     if (ok != true) return;
     try {
       final uid = FirebaseAuth.instance.currentUser!.uid;
-      await FirebaseFirestore.instance.collection('users').doc(uid).update({fieldKey: controller.text.trim()});
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        fieldKey: controller.text.trim(),
+      });
       await _loadUser();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label berhasil diubah')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$label berhasil diubah')));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal mengubah $label: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal mengubah $label: $e')));
     }
   }
 
@@ -88,10 +106,18 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Hapus Akun'),
-        content: Text('Menghapus akun akan menghilangkan semua data Anda secara permanen. Lanjutkan?'),
+        content: Text(
+          'Menghapus akun akan menghilangkan semua data Anda secara permanen. Lanjutkan?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Batal')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: Text('Hapus', style: TextStyle(color: Colors.white))),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Hapus', style: TextStyle(color: Colors.white)),
+          ),
         ],
       ),
     );
@@ -122,11 +148,14 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       final email = user?.email;
-      
+
       if (email == null) throw Exception('Email tidak ditemukan');
 
       // Re-authenticate
-      final credential = EmailAuthProvider.credential(email: email, password: password);
+      final credential = EmailAuthProvider.credential(
+        email: email,
+        password: password,
+      );
       await user!.reauthenticateWithCredential(credential);
 
       // Delete Firestore doc
@@ -136,7 +165,7 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
       try {
         final supabase = Supabase.instance.client;
         final storage = supabase.storage.from('dokumen-warga');
-        
+
         // List all files for this user
         final files = await storage.list(path: '');
         for (final file in files) {
@@ -158,17 +187,20 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
       await FirebaseAuth.instance.signOut();
 
       Navigator.pop(context); // close progress dialog
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✓ Akun berhasil dihapus'), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text('✓ Akun berhasil dihapus'),
+            backgroundColor: Colors.green,
+          ),
         );
         await Future.delayed(Duration(seconds: 1));
         context.go('/');
       }
     } on FirebaseAuthException catch (e) {
       Navigator.pop(context);
-      
+
       if (mounted) {
         String message = 'Gagal menghapus akun';
         if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
@@ -178,7 +210,7 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
         } else if (e.code == 'user-not-found') {
           message = 'Pengguna tidak ditemukan';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('❌ $message'), backgroundColor: Colors.red),
         );
@@ -187,7 +219,10 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
       Navigator.pop(context);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Gagal menghapus akun: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('❌ Gagal menghapus akun: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -203,13 +238,20 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Telepon', style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    'Telepon',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   SizedBox(height: 8),
                   Text(_maskPhone(_user?['noHp'])),
                   if (!widget.isReadOnly)
                     Align(
                       alignment: Alignment.centerRight,
-                      child: TextButton(onPressed: () => _updateField('noHp', 'Telepon', _user?['noHp']), child: Text('Ubah')),
+                      child: TextButton(
+                        onPressed: () =>
+                            _updateField('noHp', 'Telepon', _user?['noHp']),
+                        child: Text('Ubah'),
+                      ),
                     ),
                 ],
               ),
@@ -230,7 +272,11 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
                   if (!widget.isReadOnly)
                     Align(
                       alignment: Alignment.centerRight,
-                      child: TextButton(onPressed: () => _updateField('email', 'Email', _user?['email']), child: Text('Ubah')),
+                      child: TextButton(
+                        onPressed: () =>
+                            _updateField('email', 'Email', _user?['email']),
+                        child: Text('Ubah'),
+                      ),
                     ),
                 ],
               ),
@@ -251,7 +297,11 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
                   if (!widget.isReadOnly)
                     Align(
                       alignment: Alignment.centerRight,
-                      child: TextButton(onPressed: () => _updateField('nik', 'NIK', _user?['nik']), child: Text('Ubah')),
+                      child: TextButton(
+                        onPressed: () =>
+                            _updateField('nik', 'NIK', _user?['nik']),
+                        child: Text('Ubah'),
+                      ),
                     ),
                 ],
               ),
@@ -263,20 +313,22 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
   }
 
   Widget _buildDetailCard() {
-    final fields = {
-      'Nama': _user?['nama'] ?? '-',
-      'Jenis Kelamin': _user?['jenisKelamin'] ?? '-',
-      'Tempat Lahir': _user?['tempatLahir'] ?? '-',
-      'Tanggal Lahir': _user?['tanggalLahir'] ?? '-',
-      'Pekerjaan': _user?['pekerjaan'] ?? '-',
-      'Status dalam Keluarga': _user?['statusDiKeluarga'] ?? '-',
-      'Status Perkawinan': _user?['statusPerkawinan'] ?? '-',
-      'Alamat': _user?['alamat'] ?? '-',
+    if (_user == null) return SizedBox.shrink();
+
+    final fields = <String, String>{
+      'Nama': (_user?['nama'] ?? '-').toString(),
+      'Jenis Kelamin': (_user?['jenisKelamin'] ?? '-').toString(),
+      'Tempat Lahir': (_user?['tempatLahir'] ?? '-').toString(),
+      'Tanggal Lahir': (_user?['tanggalLahir'] ?? '-').toString(),
+      'Pekerjaan': (_user?['pekerjaan'] ?? '-').toString(),
+      'Status dalam Keluarga': (_user?['statusDiKeluarga'] ?? '-').toString(),
+      'Status Perkawinan': (_user?['statusPerkawinan'] ?? '-').toString(),
+      'Alamat': (_user?['alamat'] ?? '-').toString(),
       'RT/RW': 'RT ${_user?['rt'] ?? '-'} / RW ${_user?['rw'] ?? '-'}',
-      'Kelurahan': _user?['kelurahan'] ?? '-',
-      'Kecamatan': _user?['kecamatan'] ?? '-',
-      'Kota': _user?['kota'] ?? '-',
-      'Provinsi': _user?['provinsi'] ?? '-',
+      'Kelurahan': (_user?['kelurahan'] ?? '-').toString(),
+      'Kecamatan': (_user?['kecamatan'] ?? '-').toString(),
+      'Kota': (_user?['kota'] ?? '-').toString(),
+      'Provinsi': (_user?['provinsi'] ?? '-').toString(),
     };
 
     return Card(
@@ -285,18 +337,33 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ...fields.entries.map((e) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6.0),
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(e.key, style: TextStyle(color: Colors.grey[700]))),
-                      Expanded(child: Text(e.value, style: TextStyle(fontWeight: FontWeight.w600))),
-                    ],
-                  ),
-                )),
+            ...fields.entries.map(
+              (e) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        e.key,
+                        style: TextStyle(color: Colors.grey[700]),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        e.value,
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             SizedBox(height: 12),
             if (!widget.isReadOnly)
-              ElevatedButton(onPressed: () => context.push('/biodata?mode=edit'), child: Text('Ubah')),
+              ElevatedButton(
+                onPressed: () => context.push('/biodata?mode=edit'),
+                child: Text('Ubah'),
+              ),
           ],
         ),
       ),
@@ -309,6 +376,37 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
       appBar: AppBar(title: Text('Detail Akun')),
       body: _loading
           ? Center(child: CircularProgressIndicator())
+          : _user == null
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.red.shade300,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Gagal memuat data akun',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Silakan coba lagi',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                  SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() => _loading = true);
+                      _loadUser();
+                    },
+                    child: Text('Muat Ulang'),
+                  ),
+                ],
+              ),
+            )
           : SingleChildScrollView(
               padding: EdgeInsets.all(16),
               child: Column(
@@ -320,7 +418,9 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
                   SizedBox(height: 20),
                   if (!widget.isReadOnly)
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                      ),
                       onPressed: _deleteAccount,
                       child: Text('Hapus Akun'),
                     ),
@@ -354,7 +454,10 @@ class __PasswordDialogState extends State<_PasswordDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Masukkan password Anda untuk mengkonfirmasi penghapusan akun.', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+          Text(
+            'Masukkan password Anda untuk mengkonfirmasi penghapusan akun.',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+          ),
           SizedBox(height: 16),
           TextField(
             controller: _controller,
@@ -363,7 +466,9 @@ class __PasswordDialogState extends State<_PasswordDialog> {
               labelText: 'Password',
               border: OutlineInputBorder(),
               suffixIcon: IconButton(
-                icon: Icon(_showPassword ? Icons.visibility : Icons.visibility_off),
+                icon: Icon(
+                  _showPassword ? Icons.visibility : Icons.visibility_off,
+                ),
                 onPressed: () => setState(() => _showPassword = !_showPassword),
               ),
             ),
@@ -371,11 +476,14 @@ class __PasswordDialogState extends State<_PasswordDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text('Batal')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Batal'),
+        ),
         ElevatedButton(
           onPressed: () => Navigator.pop(context, _controller.text),
-          child: Text('Hapus Akun'),
           style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          child: Text('Hapus Akun'),
         ),
       ],
     );

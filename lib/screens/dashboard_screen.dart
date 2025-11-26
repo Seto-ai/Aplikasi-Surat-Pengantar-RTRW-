@@ -9,7 +9,7 @@ import '../utils/shimmer_loader.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String role;
-  DashboardScreen({required this.role});
+  const DashboardScreen({super.key, required this.role});
 
   @override
   _DashboardScreenState createState() => _DashboardScreenState();
@@ -48,9 +48,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildWargaBeranda() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    String? _selectedStatus;
-    String? _selectedKategori;
-    String _searchQuery = '';
+    String? selectedStatus;
+    String? selectedKategori;
+    String searchQuery = '';
     
     return StatefulBuilder(
       builder: (context, setState) => Column(
@@ -67,7 +67,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     prefixIcon: Icon(Icons.search),
                     border: OutlineInputBorder(),
                   ),
-                  onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
+                  onChanged: (val) => setState(() => searchQuery = val.toLowerCase()),
                 ),
                 SizedBox(height: 8),
                 // Filter dropdowns
@@ -81,7 +81,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           isDense: true,
                           contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                         ),
-                        value: _selectedStatus,
+                        initialValue: selectedStatus,
                         items: [
                           DropdownMenuItem(value: null, child: Text('Semua')),
                           DropdownMenuItem(value: 'draft', child: Text('Draft')),
@@ -92,7 +92,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           DropdownMenuItem(value: 'selesai', child: Text('Selesai')),
                           DropdownMenuItem(value: 'ditolak', child: Text('Ditolak')),
                         ],
-                        onChanged: (val) => setState(() => _selectedStatus = val),
+                        onChanged: (val) => setState(() => selectedStatus = val),
                       ),
                     ),
                     SizedBox(width: 8),
@@ -115,12 +115,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               isDense: true,
                               contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                             ),
-                            value: _selectedKategori,
+                            initialValue: selectedKategori,
                             items: [
                               DropdownMenuItem(value: null, child: Text('Semua')),
                               ...categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat))),
                             ],
-                            onChanged: (val) => setState(() => _selectedKategori = val),
+                            onChanged: (val) => setState(() => selectedKategori = val),
                           );
                         },
                       ),
@@ -179,17 +179,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   final status = data['status']?.toString() ?? '';
                   
                   // Search filter
-                  if (_searchQuery.isNotEmpty && !kategori.contains(_searchQuery) && !keperluan.contains(_searchQuery)) {
+                  if (searchQuery.isNotEmpty && !kategori.contains(searchQuery) && !keperluan.contains(searchQuery)) {
                     return false;
                   }
                   
                   // Status filter
-                  if (_selectedStatus != null && status != _selectedStatus) {
+                  if (selectedStatus != null && status != selectedStatus) {
                     return false;
                   }
                   
                   // Kategori filter
-                  if (_selectedKategori != null && kategori != _selectedKategori!.toLowerCase()) {
+                  if (selectedKategori != null && kategori != selectedKategori!.toLowerCase()) {
                     return false;
                   }
                   

@@ -8,7 +8,7 @@ class RekrutKelurahanScreen extends StatefulWidget {
   final String? type; // 'rt' atau 'rw'
   final String? nomor; // nomor RT/RW
 
-  const RekrutKelurahanScreen({this.type, this.nomor});
+  const RekrutKelurahanScreen({super.key, this.type, this.nomor});
 
   @override
   State<RekrutKelurahanScreen> createState() => _RekrutKelurahanScreenState();

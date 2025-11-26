@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../utils/ux_helper.dart';
 
 class RekrutRTRWScreen extends StatefulWidget {
+  const RekrutRTRWScreen({super.key});
+
   @override
   _RekrutRTRWScreenState createState() => _RekrutRTRWScreenState();
 }
@@ -166,7 +168,7 @@ class _RekrutRTRWScreenState extends State<RekrutRTRWScreen> {
                       context: context,
                       builder: (context) => AlertDialog(
                         title: Text('Riwayat Rekrut RT/RW'),
-                        content: Container(
+                        content: SizedBox(
                           width: double.maxFinite,
                           child: StreamBuilder<QuerySnapshot>(
                             stream: FirebaseFirestore.instance.collection('riwayatRTRW').orderBy('created_at', descending: true).snapshots(),

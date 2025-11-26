@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 class RiwayatRTRWScreen extends StatefulWidget {
+  const RiwayatRTRWScreen({super.key});
+
   @override
   _RiwayatRTRWScreenState createState() => _RiwayatRTRWScreenState();
 }

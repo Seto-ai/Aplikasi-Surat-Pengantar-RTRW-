@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -12,7 +13,7 @@ import '../utils/ux_helper.dart';
 
 class DetailSuratScreen extends StatefulWidget {
   final String id;
-  DetailSuratScreen({required this.id});
+  const DetailSuratScreen({super.key, required this.id});
 
   @override
   _DetailSuratScreenState createState() => _DetailSuratScreenState();
@@ -21,7 +22,7 @@ class DetailSuratScreen extends StatefulWidget {
 class _DetailSuratScreenState extends State<DetailSuratScreen> {
   final _firestore = FirebaseFirestore.instance;
   final _supabase = Supabase.instance.client;
-  
+
   DocumentSnapshot? suratDoc;
   bool _isLoading = false;
   String? _myRole;
@@ -43,39 +44,157 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
   Future<void> _generatePDF() async {
     if (suratDoc == null) return;
     final data = suratDoc!.data() as Map<String, dynamic>;
+    final dataPemohon = data['dataPemohon'] as Map<String, dynamic>;
     final pdf = pw.Document();
-    final nama = data['dataPemohon']['nama'] ?? 'N/A';
-    final nik = data['dataPemohon']['nik'] ?? 'N/A';
-    final alamat = data['dataPemohon']['alamat'] ?? 'N/A';
-    final tglBuat = DateFormat('dd MMMM yyyy').format((data['tanggalPengajuan'] as Timestamp).toDate());
 
-    pdf.addPage(pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      build: (pw.Context context) => pw.Column(
+    final nama = dataPemohon['nama'] ?? 'N/A';
+    final nik = dataPemohon['nik'] ?? 'N/A';
+    final tempatLahir = dataPemohon['tempatLahir'] ?? 'N/A';
+    final tglLahir = dataPemohon['tanggalLahir'] ?? 'N/A';
+    final jenisKelamin = dataPemohon['jenisKelamin'] ?? 'N/A';
+    final pekerjaan = dataPemohon['pekerjaan'] ?? 'N/A';
+    final alamat = dataPemohon['alamat'] ?? 'N/A';
+    final rt = dataPemohon['rt'] ?? 'N/A';
+    final rw = dataPemohon['rw'] ?? 'N/A';
+    final kategori = data['kategori'] ?? 'N/A';
+    final keperluan = data['keperluan'] ?? 'N/A';
+
+    final tglBuat = DateFormat(
+      'dd MMMM yyyy',
+    ).format((data['tanggalPengajuan'] as Timestamp).toDate());
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: pw.EdgeInsets.all(20),
+        build: (pw.Context context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            // Header - Judul Surat
+            pw.Center(
+              child: pw.Column(
+                children: [
+                  pw.Text(
+                    'SURAT PENGANTAR RT/RW',
+                    style: pw.TextStyle(
+                      fontSize: 18,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    'Kelurahan Sukorame',
+                    style: pw.TextStyle(
+                      fontSize: 14,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 16),
+            pw.Divider(),
+            pw.SizedBox(height: 16),
+
+            // Kalimat Pembuka
+            pw.Text(
+              'Yang bertanda tangan di bawah ini, penduduk Kelurahan Sukorame menerangkan bahwa:',
+              style: pw.TextStyle(fontSize: 11, height: 1.5),
+            ),
+            pw.SizedBox(height: 16),
+
+            // Data Pemohon
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                _buildPdfField('Nama', nama),
+                _buildPdfField('Jenis Kelamin', jenisKelamin),
+                _buildPdfField('Tempat Lahir', tempatLahir),
+                _buildPdfField('Tanggal Lahir', tglLahir),
+                _buildPdfField('Pekerjaan', pekerjaan),
+                _buildPdfField('Alamat', alamat),
+                _buildPdfField('RT', rt),
+                _buildPdfField('RW', rw),
+                _buildPdfField('NIK', nik),
+                _buildPdfField('Kategori Surat', kategori),
+                _buildPdfField('Keperluan', keperluan),
+              ],
+            ),
+            pw.SizedBox(height: 20),
+
+            // Pernyataan
+            pw.Text(
+              'Demikian surat pengantar ini diberikan kepada yang bersangkutan untuk digunakan sesuai dengan keperluan.',
+              style: pw.TextStyle(fontSize: 11, height: 1.5),
+            ),
+            pw.SizedBox(height: 32),
+
+            // Tempat dan Tanggal
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.end,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'Sukorame, $tglBuat',
+                      style: pw.TextStyle(fontSize: 11),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 32),
+
+            // Area Tanda Tangan Pemohon
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.end,
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    pw.Text('Pemohon,', style: pw.TextStyle(fontSize: 11)),
+                    pw.SizedBox(height: 50),
+                    pw.Text(
+                      '(___________________)',
+                      style: pw.TextStyle(fontSize: 11),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(nama, style: pw.TextStyle(fontSize: 10)),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
+  }
+
+  // Helper untuk membuat field di PDF
+  pw.Widget _buildPdfField(String label, String value) {
+    return pw.Padding(
+      padding: pw.EdgeInsets.only(bottom: 8),
+      child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Center(
+          pw.Container(
+            width: 120,
             child: pw.Text(
-              'SURAT KETERANGAN',
-              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+              label,
+              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
             ),
           ),
-          pw.SizedBox(height: 20),
-          pw.Text('Kategori: ${data['kategori']}', style: pw.TextStyle(fontSize: 12)),
-          pw.Text('Pemohon: $nama', style: pw.TextStyle(fontSize: 12)),
-          pw.Text('NIK: $nik', style: pw.TextStyle(fontSize: 12)),
-          pw.Text('Alamat: $alamat', style: pw.TextStyle(fontSize: 12)),
-          pw.Text('Keperluan: ${data['keperluan']}', style: pw.TextStyle(fontSize: 12)),
-          pw.Text('Tanggal Pengajuan: $tglBuat', style: pw.TextStyle(fontSize: 12)),
-          pw.SizedBox(height: 40),
-          pw.Text('Tanda Tangan: _______________________', style: pw.TextStyle(fontSize: 12)),
-          pw.SizedBox(height: 20),
-          pw.Text('Catatan: Print surat ini, tandatangani dengan tinta hitam, scan kembali, lalu upload.', 
-            style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic)),
+          pw.Text(': '),
+          pw.Expanded(child: pw.Text(value, style: pw.TextStyle(fontSize: 10))),
         ],
       ),
-    ));
-    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
+    );
   }
 
   Future<void> _uploadFotoTTD() async {
@@ -86,36 +205,74 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
         builder: (context) => AlertDialog(
           title: Text('Pilih Sumber Foto'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, ImageSource.camera), child: Text('Kamera')),
-            TextButton(onPressed: () => Navigator.pop(context, ImageSource.gallery), child: Text('Galeri')),
+            TextButton(
+              onPressed: () => Navigator.pop(context, ImageSource.camera),
+              child: Text('Kamera'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, ImageSource.gallery),
+              child: Text('Galeri'),
+            ),
           ],
         ),
       );
-      
+
       if (source == null) return;
-      
-      final pickedFile = await picker.pickImage(source: source, imageQuality: 80);
+
+      final pickedFile = await picker.pickImage(
+        source: source,
+        imageQuality: 80,
+      );
       if (pickedFile == null) return;
 
       setState(() => _isLoading = true);
 
-      // Upload ke Supabase
-      final fileName = '${widget.id}_ttd_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      // Upload ke Supabase dengan struktur folder yang benar
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final fileName =
+          '$uid/${widget.id}_ttd_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final bytes = await pickedFile.readAsBytes();
-      
-      await _supabase.storage
-          .from('dokumen-warga')
-          .uploadBinary(fileName, bytes, fileOptions: FileOptions(upsert: true));
-      
+
+      try {
+        await _supabase.storage
+            .from('dokumen-warga')
+            .uploadBinary(
+              fileName,
+              bytes,
+              fileOptions: FileOptions(upsert: true),
+            );
+      } catch (uploadError) {
+        // Jika error terkait permission, tampilkan pesan detail
+        if (uploadError.toString().contains('permission') ||
+            uploadError.toString().contains('denied')) {
+          throw Exception(
+            'Permission denied: Pastikan Anda memiliki izin untuk upload file. Hubungi admin jika masalah berlanjut.',
+          );
+        }
+        rethrow;
+      }
+
       // Get public URL
-      final url = _supabase.storage.from('dokumen-warga').getPublicUrl(fileName);
-      
-      // Update Firestore
-      await _firestore.collection('surat').doc(widget.id).update({
-        'urlSuratTtd': url,
-        'status': 'diajukan',
-        'tanggalDiajukan': Timestamp.now(),
-      });
+      final url = _supabase.storage
+          .from('dokumen-warga')
+          .getPublicUrl(fileName);
+
+      // Update Firestore - pastikan data struktur sesuai
+      try {
+        await _firestore.collection('surat').doc(widget.id).update({
+          'urlSuratTtd': url,
+          'status': 'diajukan',
+          'tanggalDiajukan': Timestamp.now(),
+        });
+      } on FirebaseException catch (e) {
+        // Handle permission errors dari Firestore rules
+        if (e.code == 'permission-denied') {
+          throw Exception(
+            'Tidak bisa upload: Surat hanya bisa diajukan dari status draft. Silakan refresh halaman dan coba lagi.',
+          );
+        }
+        rethrow;
+      }
 
       if (mounted) {
         setState(() => _isLoading = false);
@@ -135,9 +292,14 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Hapus Surat?'),
-        content: Text('Surat draft akan dihapus selamanya. Tindakan ini tidak dapat dibatalkan.'),
+        content: Text(
+          'Surat draft akan dihapus selamanya. Tindakan ini tidak dapat dibatalkan.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Batal'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
@@ -151,7 +313,41 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
 
     try {
       setState(() => _isLoading = true);
-      await _firestore.collection('surat').doc(widget.id).delete();
+
+      // Hapus file TTD dari Supabase jika ada
+      if (suratDoc != null) {
+        final data = suratDoc!.data() as Map<String, dynamic>;
+        if (data['urlSuratTtd'] != null) {
+          try {
+            final uid = FirebaseAuth.instance.currentUser!.uid;
+            final files = await _supabase.storage
+                .from('dokumen-warga')
+                .list(path: uid);
+            for (var file in files) {
+              if (file.name.contains('${widget.id}_ttd_')) {
+                await _supabase.storage.from('dokumen-warga').remove([
+                  '$uid/${file.name}',
+                ]);
+              }
+            }
+          } catch (e) {
+            print('Supabase cleanup error: $e');
+          }
+        }
+      }
+
+      // Hapus dokumen surat dari Firestore
+      try {
+        await _firestore.collection('surat').doc(widget.id).delete();
+      } on FirebaseException catch (e) {
+        if (e.code == 'permission-denied') {
+          throw Exception(
+            'Tidak bisa menghapus: Anda hanya bisa menghapus surat dengan status draft.',
+          );
+        }
+        rethrow;
+      }
+
       if (mounted) {
         UxHelper.showSuccess(context, 'Surat berhasil dihapus');
         Future.delayed(Duration(milliseconds: 800), () {
@@ -185,12 +381,17 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
     final data = suratDoc!.data() as Map<String, dynamic>;
     final status = data['status'] ?? 'draft';
     final isAjukan = status == 'diajukan';
-    final tglBuat = DateFormat('dd MMMM yyyy, HH:mm').format((data['tanggalPengajuan'] as Timestamp).toDate());
+    final tglBuat = DateFormat(
+      'dd MMMM yyyy, HH:mm',
+    ).format((data['tanggalPengajuan'] as Timestamp).toDate());
 
     return Scaffold(
       appBar: AppBar(
         title: Text('Detail Surat'),
-        leading: IconButton(icon: Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
@@ -203,14 +404,24 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: isAjukan ? Colors.blue.shade50 : Colors.orange.shade50,
-                      border: Border.all(color: isAjukan ? Colors.blue.shade700 : Colors.orange.shade700),
+                      color: isAjukan
+                          ? Colors.blue.shade50
+                          : Colors.orange.shade50,
+                      border: Border.all(
+                        color: isAjukan
+                            ? Colors.blue.shade700
+                            : Colors.orange.shade700,
+                      ),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
-                        Icon(isAjukan ? Icons.check_circle : Icons.pending, 
-                          color: isAjukan ? Colors.blue.shade700 : Colors.orange.shade700),
+                        Icon(
+                          isAjukan ? Icons.check_circle : Icons.pending,
+                          color: isAjukan
+                              ? Colors.blue.shade700
+                              : Colors.orange.shade700,
+                        ),
                         SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -218,12 +429,22 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                             children: [
                               Text(
                                 isAjukan ? 'Sudah Diajukan' : 'Belum Diajukan',
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, 
-                                  color: isAjukan ? Colors.blue.shade700 : Colors.orange.shade700),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: isAjukan
+                                      ? Colors.blue.shade700
+                                      : Colors.orange.shade700,
+                                ),
                               ),
                               Text(
-                                isAjukan ? 'Menunggu persetujuan RT' : 'Selesaikan upload TTD untuk ajukan',
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                isAjukan
+                                    ? 'Menunggu persetujuan RT'
+                                    : 'Selesaikan upload TTD untuk ajukan',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade700,
+                                ),
                               ),
                             ],
                           ),
@@ -234,7 +455,14 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                   SizedBox(height: 24),
 
                   // === DETAIL SURAT ===
-                  Text('Detail Surat', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
+                  Text(
+                    'Detail Surat',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade700,
+                    ),
+                  ),
                   SizedBox(height: 12),
                   ListTile(
                     title: Text('Jenis Surat'),
@@ -256,7 +484,14 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                   SizedBox(height: 16),
 
                   // === DATA PEMOHON ===
-                  Text('Data Pemohon', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
+                  Text(
+                    'Data Pemohon',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade700,
+                    ),
+                  ),
                   SizedBox(height: 12),
                   ListTile(
                     title: Text('Nama'),
@@ -275,20 +510,42 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                   ),
                   if (data['dataPemohon']['urlFotoKk'] != null) ...[
                     SizedBox(height: 16),
-                    Text('Foto KK:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey.shade700)),
+                    Text(
+                      'Foto KK:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
                     SizedBox(height: 8),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(data['dataPemohon']['urlFotoKk']!, height: 120, fit: BoxFit.cover),
+                      child: Image.network(
+                        data['dataPemohon']['urlFotoKk']!,
+                        height: 120,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ],
                   if (data['dataPemohon']['urlFotoKtp'] != null) ...[
                     SizedBox(height: 16),
-                    Text('Foto KTP:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey.shade700)),
+                    Text(
+                      'Foto KTP:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
                     SizedBox(height: 8),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(data['dataPemohon']['urlFotoKtp']!, height: 120, fit: BoxFit.cover),
+                      child: Image.network(
+                        data['dataPemohon']['urlFotoKtp']!,
+                        height: 120,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ],
                   SizedBox(height: 24),
@@ -296,15 +553,30 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                   SizedBox(height: 16),
 
                   // === ACTION BUTTONS ===
-                  Text('Langkah Selanjutnya', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
+                  Text(
+                    'Langkah Selanjutnya',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade700,
+                    ),
+                  ),
                   SizedBox(height: 16),
-                  
+
                   if (status == 'draft') ...[
                     // Untuk draft, tampilkan Download, Upload, Edit, Delete
                     ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                      ),
                       icon: Icon(Icons.download),
-                      label: Text('Download Surat PDF', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      label: Text(
+                        'Download Surat PDF',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       onPressed: _generatePDF,
                     ),
                     SizedBox(height: 12),
@@ -314,7 +586,13 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                         backgroundColor: Colors.green.shade700,
                       ),
                       icon: Icon(Icons.upload_file),
-                      label: Text('Upload Foto Surat TTD & Ajukan', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      label: Text(
+                        'Upload Foto Surat TTD & Ajukan',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       onPressed: _uploadFotoTTD,
                     ),
                     SizedBox(height: 12),
@@ -324,10 +602,19 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                         backgroundColor: Colors.orange.shade600,
                       ),
                       icon: Icon(Icons.edit),
-                      label: Text('Edit Surat', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      label: Text(
+                        'Edit Surat',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       onPressed: () {
                         // TODO: Implementasi edit surat
-                        UxHelper.showInfo(context, 'Fitur edit sedang dikembangkan');
+                        UxHelper.showInfo(
+                          context,
+                          'Fitur edit sedang dikembangkan',
+                        );
                       },
                     ),
                     SizedBox(height: 12),
@@ -337,7 +624,13 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                         backgroundColor: Colors.red.shade600,
                       ),
                       icon: Icon(Icons.delete),
-                      label: Text('Hapus Surat', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      label: Text(
+                        'Hapus Surat',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       onPressed: _deleteSurat,
                     ),
                   ] else if (status == 'diajukan') ...[
@@ -352,10 +645,21 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('✓ Surat sudah diajukan', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600)),
+                          Text(
+                            '✓ Surat sudah diajukan',
+                            style: TextStyle(
+                              color: Colors.green.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           SizedBox(height: 8),
-                          Text('Menunggu persetujuan dari RT. Anda akan menerima notifikasi ketika surat telah disetujui atau ditolak.',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                          Text(
+                            'Menunggu persetujuan dari RT. Anda akan menerima notifikasi ketika surat telah disetujui atau ditolak.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -372,10 +676,21 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('ℹ️ Surat sedang diproses', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.w600)),
+                          Text(
+                            'ℹ️ Surat sedang diproses',
+                            style: TextStyle(
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           SizedBox(height: 8),
-                          Text('Surat Anda sedang diproses oleh RT/RW. Anda akan menerima pemberitahuan ketika surat telah disetujui atau ditolak.',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                          Text(
+                            'Surat Anda sedang diproses oleh RT/RW. Anda akan menerima pemberitahuan ketika surat telah disetujui atau ditolak.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -383,54 +698,97 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                   ],
 
                   // Tampilkan approval controls untuk RT/RW/Kelurahan
-                  if (_myRole != null && (_myRole == 'rt' || _myRole == 'rw' || _myRole == 'rt_rw' || _myRole == 'kelurahan'))
+                  if (_myRole != null &&
+                      (_myRole == 'rt' ||
+                          _myRole == 'rw' ||
+                          _myRole == 'rt_rw' ||
+                          _myRole == 'kelurahan'))
                     if ((_myRole == 'rt' && status == 'diajukan') ||
                         (_myRole == 'rw' && status == 'acc_rt') ||
-                        (_myRole == 'rt_rw' && (status == 'diajukan' || status == 'acc_rt')) ||
+                        (_myRole == 'rt_rw' &&
+                            (status == 'diajukan' || status == 'acc_rt')) ||
                         (_myRole == 'kelurahan' && status == 'acc_rw')) ...[
                       SizedBox(height: 8),
                       Row(
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
+                              style: OutlinedButton.styleFrom(
+                                padding: EdgeInsets.symmetric(vertical: 14),
+                              ),
                               onPressed: () async {
                                 String alasan = '';
                                 final ok = await showDialog<bool>(
                                   context: context,
                                   builder: (context) => AlertDialog(
                                     title: Text('Tolak Surat'),
-                                    content: TextField(onChanged: (v) => alasan = v, decoration: InputDecoration(labelText: 'Alasan penolakan')),
+                                    content: TextField(
+                                      onChanged: (v) => alasan = v,
+                                      decoration: InputDecoration(
+                                        labelText: 'Alasan penolakan',
+                                      ),
+                                    ),
                                     actions: [
-                                      TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Batal')),
-                                      ElevatedButton(onPressed: () => Navigator.pop(context, true), child: Text('Tolak')),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: Text('Batal'),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        child: Text('Tolak'),
+                                      ),
                                     ],
                                   ),
                                 );
                                 if (ok != true) return;
                                 try {
-                                  await _firestore.collection('surat').doc(widget.id).update({
-                                    'status': 'ditolak',
-                                    'alasanTolak': alasan,
-                                    'ditolakOleh': FirebaseAuth.instance.currentUser!.uid,
-                                    'tanggalDitolak': Timestamp.now(),
-                                  });
-                                  if (mounted) UxHelper.showSuccess(context, 'Surat ditolak');
+                                  await _firestore
+                                      .collection('surat')
+                                      .doc(widget.id)
+                                      .update({
+                                        'status': 'ditolak',
+                                        'alasanTolak': alasan,
+                                        'ditolakOleh': FirebaseAuth
+                                            .instance
+                                            .currentUser!
+                                            .uid,
+                                        'tanggalDitolak': Timestamp.now(),
+                                      });
+                                  if (mounted)
+                                    UxHelper.showSuccess(
+                                      context,
+                                      'Surat ditolak',
+                                    );
                                   await _loadSurat();
-                                  Future.delayed(Duration(milliseconds: 600), () {
-                                    if (mounted) context.pop();
-                                  });
+                                  Future.delayed(
+                                    Duration(milliseconds: 600),
+                                    () {
+                                      if (mounted) context.pop();
+                                    },
+                                  );
                                 } catch (e) {
-                                  if (mounted) UxHelper.showError(context, 'Gagal menolak surat: $e');
+                                  if (mounted)
+                                    UxHelper.showError(
+                                      context,
+                                      'Gagal menolak surat: $e',
+                                    );
                                 }
                               },
-                              child: Text('Tolak', style: TextStyle(color: Colors.red)),
+                              child: Text(
+                                'Tolak',
+                                style: TextStyle(color: Colors.red),
+                              ),
                             ),
                           ),
                           SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14), backgroundColor: Colors.green.shade700),
+                              style: ElevatedButton.styleFrom(
+                                padding: EdgeInsets.symmetric(vertical: 14),
+                                backgroundColor: Colors.green.shade700,
+                              ),
                               onPressed: () async {
                                 final confirm = await showDialog<bool>(
                                   context: context,
@@ -438,26 +796,55 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                                     title: Text('Konfirmasi Terima'),
                                     content: Text('Terima surat ini?'),
                                     actions: [
-                                      TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Batal')),
-                                      ElevatedButton(onPressed: () => Navigator.pop(context, true), child: Text('Terima'))
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: Text('Batal'),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        child: Text('Terima'),
+                                      ),
                                     ],
                                   ),
                                 );
                                 if (confirm != true) return;
                                 try {
-                                  final newStatus = _myRole == 'rw' ? 'acc_rw' : _myRole == 'kelurahan' ? 'acc_kelurahan' : 'acc_rt';
-                                  await _firestore.collection('surat').doc(widget.id).update({
-                                    'status': newStatus,
-                                    'approvedBy': FirebaseAuth.instance.currentUser!.uid,
-                                    'tanggalAcc': Timestamp.now(),
-                                  });
-                                  if (mounted) UxHelper.showSuccess(context, 'Surat diterima');
+                                  final newStatus = _myRole == 'rw'
+                                      ? 'acc_rw'
+                                      : _myRole == 'kelurahan'
+                                      ? 'acc_kelurahan'
+                                      : 'acc_rt';
+                                  await _firestore
+                                      .collection('surat')
+                                      .doc(widget.id)
+                                      .update({
+                                        'status': newStatus,
+                                        'approvedBy': FirebaseAuth
+                                            .instance
+                                            .currentUser!
+                                            .uid,
+                                        'tanggalAcc': Timestamp.now(),
+                                      });
+                                  if (mounted)
+                                    UxHelper.showSuccess(
+                                      context,
+                                      'Surat diterima',
+                                    );
                                   await _loadSurat();
-                                  Future.delayed(Duration(milliseconds: 600), () {
-                                    if (mounted) context.pop();
-                                  });
+                                  Future.delayed(
+                                    Duration(milliseconds: 600),
+                                    () {
+                                      if (mounted) context.pop();
+                                    },
+                                  );
                                 } catch (e) {
-                                  if (mounted) UxHelper.showError(context, 'Gagal menerima surat: $e');
+                                  if (mounted)
+                                    UxHelper.showError(
+                                      context,
+                                      'Gagal menerima surat: $e',
+                                    );
                                 }
                               },
                               child: Text('Terima'),
@@ -466,13 +853,21 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                         ],
                       ),
                     ],
-                  
+
                   if (data['urlSuratTtd'] != null) ...[
                     SizedBox(height: 12),
                     ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 14)),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                      ),
                       icon: Icon(Icons.visibility),
-                      label: Text('Lihat Foto Surat TTD', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      label: Text(
+                        'Lihat Foto Surat TTD',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       onPressed: () {
                         showDialog(
                           context: context,

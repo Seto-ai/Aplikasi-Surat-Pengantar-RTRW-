@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 class RiwayatSuratScreen extends StatefulWidget {
+  const RiwayatSuratScreen({super.key});
+
   @override
   _RiwayatSuratScreenState createState() => _RiwayatSuratScreenState();
 }
@@ -92,7 +94,7 @@ class _RiwayatSuratScreenState extends State<RiwayatSuratScreen> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedStatusFilter,
+                        initialValue: _selectedStatusFilter,
                         decoration: InputDecoration(
                           labelText: 'Status',
                           border: OutlineInputBorder(),
@@ -125,7 +127,7 @@ class _RiwayatSuratScreenState extends State<RiwayatSuratScreen> {
                           }
                           
                           return DropdownButtonFormField<String>(
-                            value: _selectedKategoriFilter,
+                            initialValue: _selectedKategoriFilter,
                             decoration: InputDecoration(
                               labelText: 'Kategori',
                               border: OutlineInputBorder(),

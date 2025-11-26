@@ -9,6 +9,8 @@ import '../utils/localization.dart';
 import 'package:provider/provider.dart';
 
 class WargaDashboardScreen extends StatefulWidget {
+  const WargaDashboardScreen({super.key});
+
   @override
   _WargaDashboardScreenState createState() => _WargaDashboardScreenState();
 }
@@ -26,10 +28,15 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
 
   Future<void> _loadData() async {
     final uid = FirebaseAuth.instance.currentUser!.uid;
-    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
     setState(() {
       dataPemohon = doc.data();
-      anggotaKeluarga = List<Map<String, dynamic>>.from(doc['anggotaKeluarga'] ?? []);
+      anggotaKeluarga = List<Map<String, dynamic>>.from(
+        doc['anggotaKeluarga'] ?? [],
+      );
     });
   }
 
@@ -55,38 +62,54 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
             elevation: 0,
             backgroundColor: Colors.white,
             automaticallyImplyLeading: false,
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Greeting + Name di kiri
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            title: StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(FirebaseAuth.instance.currentUser?.uid)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                String userName = 'User';
+                if (snapshot.hasData && snapshot.data != null) {
+                  final data = snapshot.data!.data() as Map<String, dynamic>?;
+                  userName = data?['nama'] ?? 'User';
+                }
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      _getGreeting(locProvider),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    // Greeting + Name di kiri
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _getGreeting(locProvider),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          userName,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: 2),
-                    Text(
-                      dataPemohon?['nama'] ?? 'User',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
+                    // Language dropdown di kanan
+                    _buildLanguageDropdown(locProvider),
                   ],
-                ),
-                // Language dropdown di kanan
-                _buildLanguageDropdown(locProvider),
-              ],
+                );
+              },
             ),
           ),
-          body: _selectedIndex == 0 ? _buildBeranda(locProvider) : _buildAkun(locProvider),
+          body: _selectedIndex == 0
+              ? _buildBeranda(locProvider)
+              : _buildAkun(locProvider),
           bottomNavigationBar: BottomNavigationBar(
             items: [
               BottomNavigationBarItem(
@@ -151,8 +174,8 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
 
   Widget _buildBeranda(LocalizationProvider locProvider) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    String? _selectedStatus;
-    String _searchQuery = '';
+    String? selectedStatus;
+    String searchQuery = '';
 
     return StatefulBuilder(
       builder: (context, setState) => Column(
@@ -175,9 +198,13 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
                       labelStyle: TextStyle(color: Colors.grey.shade600),
                       prefixIcon: Icon(Icons.search, color: Color(0xFF27AE60)),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      contentPadding: EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
+                      ),
                     ),
-                    onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
+                    onChanged: (val) =>
+                        setState(() => searchQuery = val.toLowerCase()),
                   ),
                 ),
                 SizedBox(height: 12),
@@ -197,21 +224,52 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
                             labelText: locProvider.t('status'),
                             labelStyle: TextStyle(color: Colors.grey.shade600),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            prefixIcon: Icon(Icons.filter_list, color: Color(0xFF27AE60)),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.filter_list,
+                              color: Color(0xFF27AE60),
+                            ),
                           ),
-                          value: _selectedStatus,
+                          initialValue: selectedStatus,
                           items: [
-                            DropdownMenuItem(value: null, child: Text(locProvider.t('all'))),
-                            DropdownMenuItem(value: 'draft', child: Text(locProvider.t('draft'))),
-                            DropdownMenuItem(value: 'diajukan', child: Text(locProvider.t('processing'))),
-                            DropdownMenuItem(value: 'acc_rt', child: Text(locProvider.t('approved_rt'))),
-                            DropdownMenuItem(value: 'acc_rw', child: Text(locProvider.t('approved_rw'))),
-                            DropdownMenuItem(value: 'acc_kelurahan', child: Text(locProvider.t('approved_kelurahan'))),
-                            DropdownMenuItem(value: 'selesai', child: Text(locProvider.t('completed'))),
-                            DropdownMenuItem(value: 'ditolak', child: Text(locProvider.t('rejected'))),
+                            DropdownMenuItem(
+                              value: null,
+                              child: Text(locProvider.t('all')),
+                            ),
+                            DropdownMenuItem(
+                              value: 'draft',
+                              child: Text(locProvider.t('draft')),
+                            ),
+                            DropdownMenuItem(
+                              value: 'diajukan',
+                              child: Text(locProvider.t('processing')),
+                            ),
+                            DropdownMenuItem(
+                              value: 'acc_rt',
+                              child: Text(locProvider.t('approved_rt')),
+                            ),
+                            DropdownMenuItem(
+                              value: 'acc_rw',
+                              child: Text(locProvider.t('approved_rw')),
+                            ),
+                            DropdownMenuItem(
+                              value: 'acc_kelurahan',
+                              child: Text(locProvider.t('approved_kelurahan')),
+                            ),
+                            DropdownMenuItem(
+                              value: 'selesai',
+                              child: Text(locProvider.t('completed')),
+                            ),
+                            DropdownMenuItem(
+                              value: 'ditolak',
+                              child: Text(locProvider.t('rejected')),
+                            ),
                           ],
-                          onChanged: (val) => setState(() => _selectedStatus = val),
+                          onChanged: (val) =>
+                              setState(() => selectedStatus = val),
                         ),
                       ),
                     ),
@@ -224,7 +282,10 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
           // Surat List
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('surat').where('pembuatId', isEqualTo: uid).snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('surat')
+                  .where('pembuatId', isEqualTo: uid)
+                  .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
@@ -233,9 +294,19 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.error_outline, size: 48, color: Colors.red.shade400),
+                          Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: Colors.red.shade400,
+                          ),
                           SizedBox(height: 12),
-                          Text(locProvider.t('error'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          Text(
+                            locProvider.t('error'),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -244,9 +315,7 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
                 if (!snapshot.hasData) {
                   return SingleChildScrollView(
                     child: Column(
-                      children: [
-                        ShimmerLoader.listSkeleton(itemCount: 5),
-                      ],
+                      children: [ShimmerLoader.listSkeleton(itemCount: 5)],
                     ),
                   );
                 }
@@ -255,23 +324,31 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
 
                 // Sort by tanggalPengajuan (newest first)
                 docs.sort((a, b) {
-                  final aTime = (a['tanggalPengajuan'] as Timestamp?)?.toDate() ?? DateTime(1970);
-                  final bTime = (b['tanggalPengajuan'] as Timestamp?)?.toDate() ?? DateTime(1970);
+                  final aTime =
+                      (a['tanggalPengajuan'] as Timestamp?)?.toDate() ??
+                      DateTime(1970);
+                  final bTime =
+                      (b['tanggalPengajuan'] as Timestamp?)?.toDate() ??
+                      DateTime(1970);
                   return bTime.compareTo(aTime);
                 });
 
                 // Apply filters
                 final filtered = docs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
-                  final kategori = data['kategori']?.toString().toLowerCase() ?? '';
-                  final keperluan = data['keperluan']?.toString().toLowerCase() ?? '';
+                  final kategori =
+                      data['kategori']?.toString().toLowerCase() ?? '';
+                  final keperluan =
+                      data['keperluan']?.toString().toLowerCase() ?? '';
                   final status = data['status']?.toString() ?? '';
 
-                  if (_searchQuery.isNotEmpty && !kategori.contains(_searchQuery) && !keperluan.contains(_searchQuery)) {
+                  if (searchQuery.isNotEmpty &&
+                      !kategori.contains(searchQuery) &&
+                      !keperluan.contains(searchQuery)) {
                     return false;
                   }
 
-                  if (_selectedStatus != null && status != _selectedStatus) {
+                  if (selectedStatus != null && status != selectedStatus) {
                     return false;
                   }
 
@@ -285,11 +362,50 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.inbox, size: 64, color: Colors.grey.shade300),
+                          Icon(
+                            Icons.inbox,
+                            size: 64,
+                            color: Colors.grey.shade300,
+                          ),
                           SizedBox(height: 16),
-                          Text(locProvider.t('no_letters_found'), textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade600, fontSize: 16, fontWeight: FontWeight.w500)),
+                          Text(
+                            locProvider.t('no_letters_found'),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                           SizedBox(height: 8),
-                          Text(locProvider.t('start_new_letter'), textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                          Text(
+                            locProvider.t('start_new_letter'),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey.shade500,
+                              fontSize: 13,
+                            ),
+                          ),
+                          SizedBox(height: 24),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF27AE60),
+                              padding: EdgeInsets.symmetric(
+                                vertical: 14,
+                                horizontal: 24,
+                              ),
+                            ),
+                            icon: Icon(Icons.add, color: Colors.white),
+                            label: Text(
+                              locProvider.t('create_new_letter'),
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            onPressed: () => context.go('/buat-surat'),
+                          ),
                         ],
                       ),
                     ),
@@ -309,7 +425,14 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
                             padding: EdgeInsets.symmetric(vertical: 14),
                           ),
                           icon: Icon(Icons.add, color: Colors.white),
-                          label: Text(locProvider.t('create_new_letter'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                          label: Text(
+                            locProvider.t('create_new_letter'),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
                           onPressed: () => context.go('/buat-surat'),
                         ),
                       );
@@ -321,7 +444,9 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
                     final keperluan = data['keperluan'] ?? '-';
                     final status = data['status'] ?? 'draft';
                     final tanggal = data['tanggalPengajuan'] as Timestamp?;
-                    final tanggalStr = tanggal != null ? DateFormat('dd/MM/yyyy').format(tanggal.toDate()) : '-';
+                    final tanggalStr = tanggal != null
+                        ? DateFormat('dd/MM/yyyy').format(tanggal.toDate())
+                        : '-';
 
                     Color statusColor;
                     String statusLabel;
@@ -364,22 +489,48 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
                       child: ListTile(
                         contentPadding: EdgeInsets.all(12),
                         leading: Container(width: 4, color: statusColor),
-                        title: Text(kategori, style: TextStyle(fontWeight: FontWeight.w600)),
+                        title: Text(
+                          kategori,
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             SizedBox(height: 4),
-                            Text(keperluan, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12)),
+                            Text(
+                              keperluan,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 12),
+                            ),
                             SizedBox(height: 6),
                             Row(
                               children: [
                                 Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(4)),
-                                  child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: statusColor,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    statusLabel,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
                                 SizedBox(width: 8),
-                                Text(tanggalStr, style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                                Text(
+                                  tanggalStr,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
                               ],
                             ),
                           ],
@@ -427,7 +578,11 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
                           .map((s) => s[0].toUpperCase())
                           .take(2)
                           .join(),
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
                     ),
                   ),
                   SizedBox(width: 12),
@@ -435,9 +590,21 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(dataPemohon!['nama'] ?? 'Nama', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                        Text(
+                          dataPemohon!['nama'] ?? 'Nama',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         SizedBox(height: 6),
-                        Text('${locProvider.t('applicant')} • RT ${dataPemohon!['rt'] ?? '-'} / RW ${dataPemohon!['rw'] ?? '-'}', style: TextStyle(color: Colors.grey[700], fontSize: 12)),
+                        Text(
+                          '${locProvider.t('applicant')} • RT ${dataPemohon!['rt'] ?? '-'} / RW ${dataPemohon!['rw'] ?? '-'}',
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 12,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -468,7 +635,10 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
                 ),
                 Divider(height: 1),
                 ListTile(
-                  leading: Icon(Icons.family_restroom, color: Color(0xFF27AE60)),
+                  leading: Icon(
+                    Icons.family_restroom,
+                    color: Color(0xFF27AE60),
+                  ),
                   title: Text(locProvider.t('family_list')),
                   trailing: Icon(Icons.chevron_right),
                   onTap: () => context.push('/daftar-keluarga'),
@@ -476,7 +646,10 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
                 Divider(height: 1),
                 ListTile(
                   leading: Icon(Icons.logout, color: Colors.red),
-                  title: Text(locProvider.t('logout'), style: TextStyle(color: Colors.red)),
+                  title: Text(
+                    locProvider.t('logout'),
+                    style: TextStyle(color: Colors.red),
+                  ),
                   onTap: () async {
                     final confirm = await showDialog<bool>(
                       context: context,
@@ -496,7 +669,9 @@ class _WargaDashboardScreenState extends State<WargaDashboardScreen> {
                       ),
                     );
                     if (confirm == true) {
-                      await SharedPreferences.getInstance().then((prefs) => prefs.remove('role'));
+                      await SharedPreferences.getInstance().then(
+                        (prefs) => prefs.remove('role'),
+                      );
                       await FirebaseAuth.instance.signOut();
                       if (mounted) context.go('/');
                     }
