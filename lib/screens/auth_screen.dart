@@ -167,13 +167,15 @@ class _AuthScreenState extends State<AuthScreen> {
                     prefixIcon: Icon(Icons.email),
                   ),
                   validator: (val) {
-                    if (val == null || val.isEmpty)
+                    if (val == null || val.isEmpty) {
                       return 'Email tidak boleh kosong';
+                    }
                     final emailRegex = RegExp(
                       r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
                     );
-                    if (!emailRegex.hasMatch(val))
+                    if (!emailRegex.hasMatch(val)) {
                       return 'Format email tidak valid';
+                    }
                     return null;
                   },
                 ),

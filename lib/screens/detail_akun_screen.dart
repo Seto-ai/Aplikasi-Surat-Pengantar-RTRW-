@@ -76,8 +76,9 @@ class _DetailAkunScreenState extends State<DetailAkunScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (formKey.currentState?.validate() ?? false)
+              if (formKey.currentState?.validate() ?? false) {
                 Navigator.pop(context, true);
+              }
             },
             child: Text('Simpan'),
           ),

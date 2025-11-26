@@ -348,8 +348,9 @@ class _BiodataScreenState extends State<BiodataScreen> {
           });
         } else {
           Future.delayed(Duration(milliseconds: 800), () {
-            if (mounted)
+            if (mounted) {
               context.go('/dashboard/warga'); // Go to dashboard after create
+            }
           });
         }
       }

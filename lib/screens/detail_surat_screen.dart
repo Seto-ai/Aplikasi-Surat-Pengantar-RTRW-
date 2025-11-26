@@ -610,11 +610,8 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                         ),
                       ),
                       onPressed: () {
-                        // TODO: Implementasi edit surat
-                        UxHelper.showInfo(
-                          context,
-                          'Fitur edit sedang dikembangkan',
-                        );
+                        // PERBAIKAN: Implementasi edit surat
+                        context.push('/buat-surat?id=${widget.id}&mode=edit');
                       },
                     ),
                     SizedBox(height: 12),
@@ -756,11 +753,12 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                                             .uid,
                                         'tanggalDitolak': Timestamp.now(),
                                       });
-                                  if (mounted)
+                                  if (mounted) {
                                     UxHelper.showSuccess(
                                       context,
                                       'Surat ditolak',
                                     );
+                                  }
                                   await _loadSurat();
                                   Future.delayed(
                                     Duration(milliseconds: 600),
@@ -769,11 +767,12 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                                     },
                                   );
                                 } catch (e) {
-                                  if (mounted)
+                                  if (mounted) {
                                     UxHelper.showError(
                                       context,
                                       'Gagal menolak surat: $e',
                                     );
+                                  }
                                 }
                               },
                               child: Text(
@@ -827,11 +826,12 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                                             .uid,
                                         'tanggalAcc': Timestamp.now(),
                                       });
-                                  if (mounted)
+                                  if (mounted) {
                                     UxHelper.showSuccess(
                                       context,
                                       'Surat diterima',
                                     );
+                                  }
                                   await _loadSurat();
                                   Future.delayed(
                                     Duration(milliseconds: 600),
@@ -840,11 +840,12 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                                     },
                                   );
                                 } catch (e) {
-                                  if (mounted)
+                                  if (mounted) {
                                     UxHelper.showError(
                                       context,
                                       'Gagal menerima surat: $e',
                                     );
+                                  }
                                 }
                               },
                               child: Text('Terima'),

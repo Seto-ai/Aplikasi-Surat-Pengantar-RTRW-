@@ -10,7 +10,14 @@ import '../utils/ux_helper.dart';
 import '../utils/validation_helper.dart';
 
 class BuatSuratScreen extends StatefulWidget {
-  const BuatSuratScreen({super.key});
+  final String? suratId; // ID surat untuk mode edit
+  final String mode; // 'create' atau 'edit'
+
+  const BuatSuratScreen({
+    super.key,
+    this.suratId,
+    this.mode = 'create',
+  });
 
   @override
   _BuatSuratScreenState createState() => _BuatSuratScreenState();
@@ -399,13 +406,33 @@ class _BuatSuratScreenState extends State<BuatSuratScreen> {
   void initState() {
     super.initState();
     _loadBiodata();
+    // Jika mode edit, load data surat existing
+    if (widget.mode == 'edit' && widget.suratId != null) {
+      _loadSuratForEdit(widget.suratId!);
+    }
+  }
+
+  Future<void> _loadSuratForEdit(String suratId) async {
+    try {
+      final doc = await _firestore.collection('surat').doc(suratId).get();
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        setState(() {
+          kategori = data['kategori'] ?? 'Surat Keterangan Usaha';
+          keperluan = data['keperluan'] ?? '';
+          // TODO: Load data pemohon jika perlu
+        });
+      }
+    } catch (e) {
+      print('Error loading surat for edit: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Buat Surat'),
+        title: Text(widget.mode == 'edit' ? 'Edit Surat' : 'Buat Surat'),
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
           onPressed: () => context.go('/dashboard/warga'),

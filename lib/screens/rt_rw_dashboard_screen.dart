@@ -706,6 +706,13 @@ class _AkunTabRTState extends State<AkunTabRT> {
                     ),
                     Divider(height: 1),
                     ListTile(
+                      leading: Icon(Icons.edit, color: Color(0xFF27AE60)),
+                      title: Text('Ubah Profil'),
+                      trailing: Icon(Icons.chevron_right),
+                      onTap: () => context.push('/biodata?mode=edit'),
+                    ),
+                    Divider(height: 1),
+                    ListTile(
                       leading:
                           Icon(Icons.lock_outline, color: Color(0xFF27AE60)),
                       title: Text(locProvider.t('change_password')),

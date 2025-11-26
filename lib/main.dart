@@ -60,7 +60,13 @@ class MyApp extends StatelessWidget {
           return DashboardScreen(role: role); // fallback
         },
       ),
-      GoRoute(path: '/buat-surat', builder: (context, state) => BuatSuratScreen()),
+      GoRoute(
+        path: '/buat-surat',
+        builder: (context, state) => BuatSuratScreen(
+          suratId: state.uri.queryParameters['id'],
+          mode: state.uri.queryParameters['mode'] ?? 'create',
+        ),
+      ),
       GoRoute(path: '/rekrut-rtrw', builder: (context, state) => RekrutRTRWScreen()),
       GoRoute(
         path: '/rekrut-kelurahan',

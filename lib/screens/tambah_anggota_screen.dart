@@ -221,11 +221,13 @@ class _TambahAnggotaScreenState extends State<TambahAnggotaScreen> {
                 ],
                 maxLength: 16,
                 validator: (val) {
-                  if (val == null || val.isEmpty)
+                  if (val == null || val.isEmpty) {
                     return 'NIK tidak boleh kosong';
+                  }
                   if (val.length != 16) return 'NIK harus 16 digit';
-                  if (!RegExp(r'^[0-9]+$').hasMatch(val))
+                  if (!RegExp(r'^[0-9]+$').hasMatch(val)) {
                     return 'NIK hanya boleh berisi angka';
+                  }
                   return null;
                 },
                 onChanged: (val) => nik = val,

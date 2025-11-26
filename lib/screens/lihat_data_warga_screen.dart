@@ -550,6 +550,19 @@ class _LihatDataWargaScreenState extends State<LihatDataWargaScreen> with Ticker
                           ],
                         ),
                         trailing: Icon(Icons.person),
+                        onTap: () {
+                          // PERBAIKAN: Validasi RT sebelum bisa lihat detail warga
+                          if (_userRole == 'rt' && rt != _userRt) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Hanya bisa melihat warga di RT Anda sendiri'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          context.push('/detail-akun?readOnly=true');
+                        },
                       ),
                     );
                   },
