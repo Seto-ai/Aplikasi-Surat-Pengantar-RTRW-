@@ -215,6 +215,20 @@ class _BerandaTabRTState extends State<BerandaTabRT> {
   String _searchQuery = '';
   String _sortBy = 'newest';
 
+  // Helper function to safely parse tanggalPengajuan
+  DateTime _parseTanggal(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    } else if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (e) {
+        return DateTime(1970);
+      }
+    }
+    return DateTime(1970);
+  }
+
   String _getStatusLabel(String status) {
     final labelMap = {
       'draft': 'Draft',
@@ -276,10 +290,6 @@ class _BerandaTabRTState extends State<BerandaTabRT> {
                       _buildSortChip('Terbaru', 'newest', setState),
                       const SizedBox(width: 8),
                       _buildSortChip('Terlama', 'oldest', setState),
-                      const SizedBox(width: 8),
-                      _buildSortChip('Disetujui', 'acc', setState),
-                      const SizedBox(width: 8),
-                      _buildSortChip('Ditolak', 'ditolak', setState),
                     ],
                   ),
                 ),
@@ -317,14 +327,11 @@ class _BerandaTabRTState extends State<BerandaTabRT> {
     Query query = _firestore.collection('surat');
 
     // Sesuaikan query berdasarkan peran untuk menggunakan field di dalam dataPemohon
+    // Ambil SEMUA surat (tanpa filter status), filter status dilakukan di client-side
     if (widget.role == 'rt') {
-      query = query
-          .where('dataPemohon.rt', isEqualTo: widget.myRT)
-          .where('status', isEqualTo: 'diajukan');
+      query = query.where('dataPemohon.rt', isEqualTo: widget.myRT);
     } else if (widget.role == 'rw') {
-      query = query
-          .where('dataPemohon.rw', isEqualTo: widget.myRW)
-          .where('status', isEqualTo: 'acc_rt');
+      query = query.where('dataPemohon.rw', isEqualTo: widget.myRW);
     }
 
     return StreamBuilder<QuerySnapshot>(
@@ -340,38 +347,30 @@ class _BerandaTabRTState extends State<BerandaTabRT> {
 
         var docs = snapshot.data!.docs;
 
+        // Filter berdasarkan status yang relevan untuk role
+        // RT dan RW hanya melihat surat yang masih diajukan (pending)
+        // Saat disetujui atau ditolak, otomatis hilang dari dashboard
+        if (widget.role == 'rt') {
+          // RT hanya lihat surat yang: diajukan (pending)
+          docs = docs.where((d) => d['status'] == 'diajukan').toList();
+        } else if (widget.role == 'rw') {
+          // RW hanya lihat surat yang: acc_rt (menunggu RW)
+          docs = docs.where((d) => d['status'] == 'acc_rt').toList();
+        }
+
         // Sort
         if (_sortBy == 'oldest') {
           docs.sort((a, b) {
-            final aTime =
-                (a['tanggalPengajuan'] as Timestamp?)?.toDate() ??
-                DateTime(1970);
-            final bTime =
-                (b['tanggalPengajuan'] as Timestamp?)?.toDate() ??
-                DateTime(1970);
+            final aTime = _parseTanggal(a['tanggalPengajuan']);
+            final bTime = _parseTanggal(b['tanggalPengajuan']);
             return aTime.compareTo(bTime);
           });
         } else if (_sortBy == 'newest') {
           docs.sort((a, b) {
-            final aTime =
-                (a['tanggalPengajuan'] as Timestamp?)?.toDate() ??
-                DateTime(1970);
-            final bTime =
-                (b['tanggalPengajuan'] as Timestamp?)?.toDate() ??
-                DateTime(1970);
+            final aTime = _parseTanggal(a['tanggalPengajuan']);
+            final bTime = _parseTanggal(b['tanggalPengajuan']);
             return bTime.compareTo(aTime);
           });
-        } else if (_sortBy == 'acc') {
-          docs = docs
-              .where(
-                (d) =>
-                    d['status'] == 'acc_rt' ||
-                    d['status'] == 'acc_rw' ||
-                    d['status'] == 'acc_kelurahan',
-              )
-              .toList();
-        } else if (_sortBy == 'ditolak') {
-          docs = docs.where((d) => d['status'] == 'ditolak').toList();
         }
 
         // Filter by search
@@ -739,13 +738,6 @@ class _AkunTabRTState extends State<AkunTabRT> {
                       title: Text(locProvider.t('view_profile')),
                       trailing: Icon(Icons.chevron_right),
                       onTap: () => context.push('/detail-akun'),
-                    ),
-                    Divider(height: 1),
-                    ListTile(
-                      leading: Icon(Icons.edit, color: Color(0xFF27AE60)),
-                      title: Text('Ubah Profil'),
-                      trailing: Icon(Icons.chevron_right),
-                      onTap: () => context.push('/biodata?mode=edit'),
                     ),
                     Divider(height: 1),
                     ListTile(

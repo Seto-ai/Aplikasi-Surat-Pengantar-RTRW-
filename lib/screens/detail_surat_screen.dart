@@ -379,10 +379,89 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
 
     final data = suratDoc!.data() as Map<String, dynamic>;
     final status = data['status'] ?? 'draft';
-    final isAjukan = status == 'diajukan';
     final tglBuat = DateFormat(
       'dd MMMM yyyy, HH:mm',
     ).format((data['tanggalPengajuan'] as Timestamp).toDate());
+
+    // Helper function untuk get status display info
+    Map<String, dynamic> getStatusInfo() {
+      switch (status) {
+        case 'draft':
+          return {
+            'label': 'Belum Diajukan',
+            'desc': 'Selesaikan upload TTD untuk ajukan',
+            'bgColor': Colors.orange.shade50,
+            'borderColor': Colors.orange.shade700,
+            'textColor': Colors.orange.shade700,
+            'icon': Icons.pending,
+          };
+        case 'diajukan':
+          return {
+            'label': 'Sudah Diajukan',
+            'desc': 'Menunggu persetujuan RT',
+            'bgColor': Colors.blue.shade50,
+            'borderColor': Colors.blue.shade700,
+            'textColor': Colors.blue.shade700,
+            'icon': Icons.check_circle,
+          };
+        case 'acc_rt':
+          return {
+            'label': 'Disetujui RT',
+            'desc': 'Menunggu persetujuan RW',
+            'bgColor': Colors.blue.shade50,
+            'borderColor': Colors.blue.shade700,
+            'textColor': Colors.blue.shade700,
+            'icon': Icons.check_circle,
+          };
+        case 'acc_rw':
+          return {
+            'label': 'Disetujui RW',
+            'desc': 'Menunggu persetujuan Kelurahan',
+            'bgColor': Colors.blue.shade50,
+            'borderColor': Colors.blue.shade700,
+            'textColor': Colors.blue.shade700,
+            'icon': Icons.check_circle,
+          };
+        case 'acc_kelurahan':
+          return {
+            'label': 'Disetujui Kelurahan',
+            'desc': 'Surat telah disetujui',
+            'bgColor': Colors.green.shade50,
+            'borderColor': Colors.green.shade700,
+            'textColor': Colors.green.shade700,
+            'icon': Icons.check_circle,
+          };
+        case 'selesai':
+          return {
+            'label': 'Selesai',
+            'desc': 'Surat telah selesai diproses',
+            'bgColor': Colors.green.shade50,
+            'borderColor': Colors.green.shade700,
+            'textColor': Colors.green.shade700,
+            'icon': Icons.check_circle,
+          };
+        case 'ditolak':
+          return {
+            'label': 'Ditolak',
+            'desc': (data['alasanTolak'] as String?) ?? 'Tidak ada keterangan',
+            'bgColor': Colors.red.shade50,
+            'borderColor': Colors.red.shade700,
+            'textColor': Colors.red.shade700,
+            'icon': Icons.cancel,
+          };
+        default:
+          return {
+            'label': 'Status Tidak Diketahui',
+            'desc': status,
+            'bgColor': Colors.grey.shade50,
+            'borderColor': Colors.grey.shade700,
+            'textColor': Colors.grey.shade700,
+            'icon': Icons.help,
+          };
+      }
+    }
+
+    final statusInfo = getStatusInfo();
 
     return Scaffold(
       appBar: AppBar(
@@ -403,23 +482,17 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: isAjukan
-                          ? Colors.blue.shade50
-                          : Colors.orange.shade50,
+                      color: statusInfo['bgColor'] as Color,
                       border: Border.all(
-                        color: isAjukan
-                            ? Colors.blue.shade700
-                            : Colors.orange.shade700,
+                        color: statusInfo['borderColor'] as Color,
                       ),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
                         Icon(
-                          isAjukan ? Icons.check_circle : Icons.pending,
-                          color: isAjukan
-                              ? Colors.blue.shade700
-                              : Colors.orange.shade700,
+                          statusInfo['icon'] as IconData,
+                          color: statusInfo['textColor'] as Color,
                         ),
                         SizedBox(width: 12),
                         Expanded(
@@ -427,19 +500,15 @@ class _DetailSuratScreenState extends State<DetailSuratScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                isAjukan ? 'Sudah Diajukan' : 'Belum Diajukan',
+                                statusInfo['label'] as String,
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: isAjukan
-                                      ? Colors.blue.shade700
-                                      : Colors.orange.shade700,
+                                  color: statusInfo['textColor'] as Color,
                                 ),
                               ),
                               Text(
-                                isAjukan
-                                    ? 'Menunggu persetujuan RT'
-                                    : 'Selesaikan upload TTD untuk ajukan',
+                                statusInfo['desc'] as String,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey.shade700,

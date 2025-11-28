@@ -49,14 +49,18 @@ class MyApp extends StatelessWidget {
       // Check if user is authenticated
       final isLoggedIn = FirebaseAuth.instance.currentUser != null;
 
+      // Allow login and register pages even if authenticated (for logout flow)
+      if (state.matchedLocation == '/login' ||
+          state.matchedLocation == '/register') {
+        return null;
+      }
+
       if (isLoggedIn) {
         // User sudah login
         final role = await _getRoleFromPrefs();
 
-        // Jika user akses landing page, login, atau register → redirect ke dashboard
-        if (state.matchedLocation == '/' ||
-            state.matchedLocation == '/login' ||
-            state.matchedLocation == '/register') {
+        // Jika user akses landing page → redirect ke dashboard
+        if (state.matchedLocation == '/') {
           if (role != null) {
             return '/dashboard/$role';
           }
@@ -86,8 +90,14 @@ class MyApp extends StatelessWidget {
     },
     routes: [
       GoRoute(path: '/', builder: (context, state) => LandingPageScreen()),
-      GoRoute(path: '/login', builder: (context, state) => AuthScreen()),
-      GoRoute(path: '/register', builder: (context, state) => AuthScreen()),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => AuthScreen(isLoginMode: true),
+      ),
+      GoRoute(
+        path: '/register',
+        builder: (context, state) => AuthScreen(isLoginMode: false),
+      ),
       GoRoute(
         path: '/biodata',
         builder: (context, state) => BiodataScreen(

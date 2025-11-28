@@ -6,7 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/auth_error_helper.dart';
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+  final bool isLoginMode;
+  const AuthScreen({super.key, this.isLoginMode = true});
 
   @override
   _AuthScreenState createState() => _AuthScreenState();
@@ -18,7 +19,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   String emailOrPhone = '', password = '';
-  bool isLogin = true;
+  late bool isLogin;
   bool _obscurePassword = true;
   bool _isLoading = false;
 
@@ -88,6 +89,7 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   void initState() {
     super.initState();
+    isLogin = widget.isLoginMode;
     _checkPersist();
   }
 

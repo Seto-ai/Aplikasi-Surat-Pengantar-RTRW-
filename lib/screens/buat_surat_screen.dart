@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../constants/surat_categories.dart';
 import '../utils/ux_helper.dart';
 import '../utils/validation_helper.dart';
 
@@ -23,7 +24,7 @@ class _BuatSuratScreenState extends State<BuatSuratScreen> {
   final _firestore = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
-  String kategori = 'Surat Keterangan Usaha';
+  String kategori = '';
   String keperluan = '';
   Map<String, dynamic>? dataPemohon;
   List<Map<String, dynamic>> anggotaKeluarga = [];
@@ -361,7 +362,7 @@ class _BuatSuratScreenState extends State<BuatSuratScreen> {
   }
 
   Future<void> _buatSurat() async {
-    if (selectedPemohon == null || keperluan.isEmpty) {
+    if (selectedPemohon == null || kategori.isEmpty || keperluan.isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Lengkapi field')));
@@ -373,7 +374,7 @@ class _BuatSuratScreenState extends State<BuatSuratScreen> {
       final cleanPemohon = Map<String, dynamic>.from(selectedPemohon ?? {});
       cleanPemohon.remove('isSelf');
 
-      final suratRef = await _firestore.collection('surat').add({
+      final suratData = {
         'dataPemohon': cleanPemohon,
         'kategori': kategori,
         'keperluan': keperluan,
@@ -382,13 +383,32 @@ class _BuatSuratScreenState extends State<BuatSuratScreen> {
         'status': 'draft',
         'urlSuratTtd': null,
         'tanggalPengajuan': Timestamp.now(),
-      });
+      };
 
-      if (mounted) {
-        UxHelper.showSuccess(context, 'Surat dibuat');
-        Future.delayed(Duration(milliseconds: 800), () {
-          if (mounted) context.push('/detail-surat/${suratRef.id}');
-        });
+      // Check apakah edit atau create
+      if (widget.mode == 'edit' && widget.suratId != null) {
+        // MODE EDIT: Update dokumen existing
+        await _firestore
+            .collection('surat')
+            .doc(widget.suratId!)
+            .update(suratData);
+
+        if (mounted) {
+          UxHelper.showSuccess(context, 'Surat berhasil diperbarui');
+          Future.delayed(Duration(milliseconds: 800), () {
+            if (mounted) context.push('/detail-surat/${widget.suratId}');
+          });
+        }
+      } else {
+        // MODE CREATE: Buat dokumen baru
+        final suratRef = await _firestore.collection('surat').add(suratData);
+
+        if (mounted) {
+          UxHelper.showSuccess(context, 'Surat dibuat');
+          Future.delayed(Duration(milliseconds: 800), () {
+            if (mounted) context.push('/detail-surat/${suratRef.id}');
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -449,19 +469,15 @@ class _BuatSuratScreenState extends State<BuatSuratScreen> {
             ),
             SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              initialValue: kategori,
+              initialValue: kategori.isEmpty ? '' : kategori,
               decoration: InputDecoration(
                 labelText: 'Kategori *',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.description),
               ),
-              items: [
-                'Surat Keterangan Usaha',
-                'Surat Pengantar Nikah',
-                'Surat Keterangan Tidak Mampu',
-                'Surat Domisili',
-              ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              items: SuratCategories.getDropdownItems(),
               onChanged: (val) => setState(() => kategori = val!),
+              isExpanded: true,
             ),
             SizedBox(height: 12),
             TextFormField(
@@ -528,11 +544,15 @@ class _BuatSuratScreenState extends State<BuatSuratScreen> {
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             SizedBox(height: 4),
                             Text(
                               'NIK: ${selectedPemohon!['nik'] ?? 'N/A'}',
                               style: TextStyle(fontSize: 12),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ] else ...[
                             SizedBox(height: 4),
@@ -547,6 +567,7 @@ class _BuatSuratScreenState extends State<BuatSuratScreen> {
                         ],
                       ),
                     ),
+                    SizedBox(width: 8),
                     Icon(
                       Icons.chevron_right,
                       color: selectedPemohon != null

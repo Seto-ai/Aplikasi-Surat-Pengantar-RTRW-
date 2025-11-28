@@ -108,30 +108,83 @@ class _BiodataScreenState extends State<BiodataScreen> {
 
   Future<void> _loadRtRwData() async {
     try {
+      print('[DEBUG] Loading RT/RW data...');
+
       // Load RW list
       final rwSnapshot = await _firestore.collection('rw').get();
-      final rwList =
-          rwSnapshot.docs
-              .map((doc) => doc['nomor_rw']?.toString() ?? '')
-              .where((rw) => rw.isNotEmpty)
-              .toList()
-            ..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+      print(
+        '[DEBUG] RW snapshot received: ${rwSnapshot.docs.length} documents',
+      );
+
+      var rwList = rwSnapshot.docs
+          .map((doc) {
+            final nomorRw = doc['nomor_rw']?.toString() ?? '';
+            print('[DEBUG] RW doc - nomor_rw: $nomorRw, data: ${doc.data()}');
+            return nomorRw;
+          })
+          .where((rw) => rw.isNotEmpty)
+          .toList();
+
+      print('[DEBUG] RW list before dedup and sort: $rwList');
+
+      // Sort with safe parsing
+      rwList.sort((a, b) {
+        final aNum = int.tryParse(a) ?? 999;
+        final bNum = int.tryParse(b) ?? 999;
+        return aNum.compareTo(bNum);
+      });
+
+      // Remove duplicates after sorting
+      rwList = rwList.toSet().toList();
+
+      print('[DEBUG] RW list after dedup and sort: $rwList');
 
       // Load RT list
       final rtSnapshot = await _firestore.collection('rt').get();
-      final rtList =
-          rtSnapshot.docs
-              .map((doc) => doc['nomor_rt']?.toString() ?? '')
-              .where((rt) => rt.isNotEmpty)
-              .toList()
-            ..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+      print(
+        '[DEBUG] RT snapshot received: ${rtSnapshot.docs.length} documents',
+      );
+
+      var rtList = rtSnapshot.docs
+          .map((doc) {
+            final nomorRt = doc['nomor_rt']?.toString() ?? '';
+            print('[DEBUG] RT doc - nomor_rt: $nomorRt, data: ${doc.data()}');
+            return nomorRt;
+          })
+          .where((rt) => rt.isNotEmpty)
+          .toList();
+
+      print('[DEBUG] RT list before dedup and sort: $rtList');
+
+      // Sort with safe parsing
+      rtList.sort((a, b) {
+        final aNum = int.tryParse(a) ?? 999;
+        final bNum = int.tryParse(b) ?? 999;
+        return aNum.compareTo(bNum);
+      });
+
+      // Remove duplicates after sorting
+      rtList = rtList.toSet().toList();
+
+      print('[DEBUG] RT list after dedup and sort: $rtList');
 
       setState(() {
         _rwList = rwList;
         _rtList = rtList;
       });
-    } catch (e) {
+
+      print('[DEBUG] RT/RW data loaded successfully');
+    } catch (e, stackTrace) {
       print('Error loading RT/RW data: $e');
+      print('Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading RT/RW: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -372,10 +425,12 @@ class _BiodataScreenState extends State<BiodataScreen> {
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
           onPressed: () {
-            if (widget.isEditMode) {
-              context.pop(); // Go back to previous page
+            // Cek apakah ada navigator history
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
             } else {
-              context.go('/'); // Go to home if not edit mode
+              // Jika tidak ada history (baru login), go to login
+              context.go('/login');
             }
           },
         ),
@@ -546,7 +601,9 @@ class _BiodataScreenState extends State<BiodataScreen> {
                               labelText: 'RT *',
                               border: OutlineInputBorder(),
                             ),
-                            initialValue: _selectedRt,
+                            initialValue: _rtList.contains(_selectedRt)
+                                ? _selectedRt
+                                : null,
                             items: _rtList.isEmpty
                                 ? [
                                     DropdownMenuItem(
@@ -575,7 +632,9 @@ class _BiodataScreenState extends State<BiodataScreen> {
                               labelText: 'RW *',
                               border: OutlineInputBorder(),
                             ),
-                            initialValue: _selectedRw,
+                            initialValue: _rwList.contains(_selectedRw)
+                                ? _selectedRw
+                                : null,
                             items: _rwList.isEmpty
                                 ? [
                                     DropdownMenuItem(

@@ -33,7 +33,7 @@ class _KelurahanDashboardScreenState extends State<KelurahanDashboardScreen> {
       final doc = await _firestore.collection('users').doc(uid).get();
       if (doc.exists) {
         setState(() {
-          _currentUserName = doc['nama'] ?? 'User';
+          _currentUserName = (doc['nama'] as String?) ?? 'User';
         });
       }
     } catch (e) {
@@ -115,7 +115,7 @@ class _KelurahanDashboardScreenState extends State<KelurahanDashboardScreen> {
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.person_add),
-                label: 'Rekrut',
+                label: 'Pilih RT & RW',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.account_circle),
@@ -203,6 +203,20 @@ class _BerandaTabKelurahanState extends State<BerandaTabKelurahan> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String _searchQuery = '';
   String _sortBy = 'newest';
+
+  // Helper function to safely parse tanggalPengajuan
+  DateTime _parseTanggal(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    } else if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (e) {
+        return DateTime(1970);
+      }
+    }
+    return DateTime(1970);
+  }
 
   String _getStatusLabel(String status) {
     final labelMap = {
@@ -297,10 +311,11 @@ class _BerandaTabKelurahanState extends State<BerandaTabKelurahan> {
   }
 
   Widget _buildSuratListStream() {
-    // Kelurahan lihat surat yang sudah acc_rw (tahap final) dan yang sudah acc_kelurahan atau ditolak
+    // Kelurahan hanya lihat surat yang sudah disetujui RT dan RW (status: acc_rw)
+    // Setelah kelurahan menyetujui, surat hilang dari dashboard
     Query query = _firestore
         .collection('surat')
-        .where('status', whereIn: ['acc_rw', 'acc_kelurahan', 'ditolak']);
+        .where('status', isEqualTo: 'acc_rw');
 
     return StreamBuilder<QuerySnapshot>(
       stream: query.snapshots(),
@@ -318,22 +333,14 @@ class _BerandaTabKelurahanState extends State<BerandaTabKelurahan> {
         // Sort based on selected filter
         if (_sortBy == 'oldest') {
           docs.sort((a, b) {
-            final aTime =
-                (a['tanggalPengajuan'] as Timestamp?)?.toDate() ??
-                DateTime(1970);
-            final bTime =
-                (b['tanggalPengajuan'] as Timestamp?)?.toDate() ??
-                DateTime(1970);
+            final aTime = _parseTanggal(a['tanggalPengajuan']);
+            final bTime = _parseTanggal(b['tanggalPengajuan']);
             return aTime.compareTo(bTime);
           });
         } else if (_sortBy == 'newest') {
           docs.sort((a, b) {
-            final aTime =
-                (a['tanggalPengajuan'] as Timestamp?)?.toDate() ??
-                DateTime(1970);
-            final bTime =
-                (b['tanggalPengajuan'] as Timestamp?)?.toDate() ??
-                DateTime(1970);
+            final aTime = _parseTanggal(a['tanggalPengajuan']);
+            final bTime = _parseTanggal(b['tanggalPengajuan']);
             return bTime.compareTo(aTime);
           });
         }
@@ -366,10 +373,10 @@ class _BerandaTabKelurahanState extends State<BerandaTabKelurahan> {
   }
 
   Widget _buildSuratCard(String docId, Map<String, dynamic> data) {
-    final namaPemohon = data['namaPemohon'] ?? 'Tanpa Nama';
-    final keperluan = data['keperluan'] ?? '-';
-    final statusLabel = _getStatusLabel(data['status'] ?? 'draft');
-    final statusColor = _getStatusColor(data['status'] ?? 'draft');
+    final namaPemohon = (data['namaPemohon'] as String?) ?? 'Tanpa Nama';
+    final keperluan = (data['keperluan'] as String?) ?? '-';
+    final statusLabel = _getStatusLabel((data['status'] as String?) ?? 'draft');
+    final statusColor = _getStatusColor((data['status'] as String?) ?? 'draft');
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
@@ -479,15 +486,15 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
 
         if (rwSnapshot.docs.isNotEmpty) {
           final rwData = rwSnapshot.docs.first;
-          final ketuaNama = rwData['nama'];
-          final ketuaUid = rwData['uid'] ?? '';
+          final ketuaNama = (rwData['nama'] as String?) ?? '';
+          final ketuaUid = (rwData['uid'] as String?) ?? '';
 
           print(
             '[DEBUG] RW $rwNum found in collection rw - nama: "$ketuaNama", uid: "$ketuaUid"',
           );
 
           // If nama is empty/null, try fallback to users collection with role='rw'
-          if (ketuaNama == null || ketuaNama.isEmpty) {
+          if (ketuaNama.isEmpty) {
             print(
               '[DEBUG] RW $rwNum has empty nama, trying users collection with role=rw',
             );
@@ -499,12 +506,13 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
                 .get();
             if (rwUserSnapshot.docs.isNotEmpty) {
               final rwUserData = rwUserSnapshot.docs.first;
-              final fallbackNama = rwUserData['nama'] ?? 'RW $rwNum';
+              final fallbackNama =
+                  (rwUserData['nama'] as String?) ?? 'RW $rwNum';
               rwDoc = {
                 'id': rwData.id,
                 'rw': rwNum,
                 'nama': fallbackNama,
-                'uid': rwUserData['uid'] ?? ketuaUid,
+                'uid': (rwUserData['uid'] as String?) ?? ketuaUid,
               };
               print(
                 '[DEBUG] Found fallback RW $rwNum from users: $fallbackNama',
@@ -542,9 +550,9 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
               .get();
           if (rwUserSnapshot.docs.isNotEmpty) {
             final rwUserData = rwUserSnapshot.docs.first;
-            final ketuaNama = rwUserData['nama'] ?? 'RW $rwNum';
+            final ketuaNama = (rwUserData['nama'] as String?) ?? 'RW $rwNum';
             rwDoc['nama'] = ketuaNama;
-            rwDoc['uid'] = rwUserData['uid'] ?? '';
+            rwDoc['uid'] = (rwUserData['uid'] as String?) ?? '';
             print(
               '[DEBUG] Found ketua RW $rwNum from users collection: $ketuaNama',
             );
@@ -672,7 +680,7 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
           children: [
             ListTile(
               title: Text(
-                'Ketua RW $rwValue - ${rw['nama'] ?? "RW $rwValue"}',
+                'Ketua RW $rwValue - ${(rw['nama'] as String?) ?? "RW $rwValue"}',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               trailing: Icon(
@@ -701,7 +709,7 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
                       padding: const EdgeInsets.only(left: 16),
                       child: ListTile(
                         title: Text(
-                          'Ketua RT $rtValue - ${rt['nama'] ?? "RT $rtValue"}',
+                          'Ketua RT $rtValue - ${(rt['nama'] as String?) ?? "RT $rtValue"}',
                           style: const TextStyle(fontWeight: FontWeight.w500),
                         ),
                         trailing: Icon(
@@ -736,7 +744,7 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
   }
 
   Widget _buildWargaCard(Map<String, dynamic> warga) {
-    final wargaId = warga['id'] ?? warga.keys.first;
+    final wargaId = (warga['id'] as String?) ?? '';
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: ListTile(
@@ -744,9 +752,9 @@ class _LihatWargaTabKelurahanState extends State<LihatWargaTabKelurahan> {
           backgroundColor: Colors.green.shade700,
           child: const Icon(Icons.person, color: Colors.white),
         ),
-        title: Text(warga['nama'] ?? 'N/A'),
+        title: Text((warga['nama'] as String?) ?? 'N/A'),
         subtitle: Text(
-          warga['email'] ?? 'N/A',
+          (warga['email'] as String?) ?? 'N/A',
           style: const TextStyle(fontSize: 12),
         ),
         trailing: const Icon(
@@ -885,7 +893,7 @@ class _ManajemenRTRWTabState extends State<ManajemenRTRWTab> {
               title,
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
-            subtitle: Text(person['nama'] ?? 'N/A'),
+            subtitle: Text((person['nama'] as String?) ?? 'N/A'),
             trailing: const Icon(Icons.info_outline),
             onTap: () => context.push('/detail-akun?readOnly=true'),
           ),
@@ -926,7 +934,7 @@ class _ManajemenRTRWTabState extends State<ManajemenRTRWTab> {
         return Card(
           child: ListTile(
             title: Text(
-              history['nama'] ?? 'N/A',
+              (history['nama'] as String?) ?? 'N/A',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             subtitle: Text('$posisiStr\n$periodeStr'),
@@ -986,7 +994,7 @@ class _RekrutTabKelurahanState extends State<RekrutTabKelurahan> {
           _warnings.add({
             'type': 'rw',
             'nomor': rwValue,
-            'nama': rwData['nama'],
+            'nama': (rwData['nama'] as String?) ?? 'RW $rwValue',
             'message': 'RW $rwValue belum ada yang menjabat',
           });
         }
@@ -1144,9 +1152,9 @@ class _AkunTabKelurahanState extends State<AkunTabKelurahan> {
       final doc = await _firestore.collection('users').doc(uid).get();
       if (doc.exists) {
         setState(() {
-          _userName = doc['nama'] ?? 'User';
-          _userEmail = doc['email'] ?? 'N/A';
-          _userKelurahan = doc['kelurahan'] ?? 'N/A';
+          _userName = (doc['nama'] as String?) ?? 'User';
+          _userEmail = (doc['email'] as String?) ?? 'N/A';
+          _userKelurahan = (doc['kelurahan'] as String?) ?? 'N/A';
         });
       }
     } catch (e) {
